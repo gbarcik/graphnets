@@ -50,7 +50,7 @@ def iter_DFS(x, E):
 
     neigh = np.argwhere(E[i0]==1)[:,1] # Select the neighbours of this node
 
-    neigh = sorted(neigh, key=lambda id: graph.nodes[id]['priority'], reverse=True)
+    neigh = sorted(neigh, key=lambda id: graph.nodes[id]['priority'])
 
     for ind in neigh:
         # If son was not explored, update it it
