@@ -2,8 +2,6 @@
 
 Extending the Neural Graph Algorithm Executor
 
-Name: Extending the Neural Graph Algorithm Executor
-
 Topic: algorithms/data structures, graph neural networks, learning-to-execute
 
 Category: implementation + research
