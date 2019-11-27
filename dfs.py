@@ -40,20 +40,20 @@ def iter_DFS(x, E):
     -------
     Modifies x, using our DFS algorithm
     '''
-    i0 = np.argmax(x)
-    next_label = x[i0]+1
+
+    i0 = np.argmax(x) # Select the node with highest rank
+    next_label = x[i0]+1 # Detect rank to assign
+
+    x[i0] = np.amin(x)-1 # Mark node as seen. Implicitely encodes the position in which the node was seen
     
-    neigh = np.argwhere(E[i0]==1)[:,1]
-    
-    branch_done = True
-    
+    neigh = np.argwhere(E[i0]==1)[:,1] # Select the neighbourgs of this node
+        
     for ind in neigh:
+        # If son was not explored, update it it
         if x[ind] == 0:
-            x[ind] = next_label
-            next_label += 1
-            branch_done = False
-            
-    if branch_done: x[i0]=np.amin(x)-1
+            x[ind] = next_label # Mark the sons with highest rank, so that it is explored in priority
+            next_label += 1 # Update highest rank
+    
 
 
 if __name__=="__main__":
