@@ -1,0 +1,19 @@
+graph generation:
+
+[] ladder graphs
+[] 2d grid graphs
+[] trees, uniformly randomly generated from the Pruffer sequence
+[] erdos-renyi graphs with edge probability min(logV/V, 0.5)
+[] barabasi-albert graphs, attaching either four or five edges to every incoming node
+[] 4-community graphs - first generating four disjoint erdos-renyi graphs with edge probability 0.7, followed by interconnecting their nodes with edge probability 0.01
+[] 4-caveman graphs, having each of their intra-clique edges removed with probability 0.7, followed by inserting 0.025|V| additional shortcut edges between cliques
+
+implementation of graph algorithms
+
+[] topological sort
+[] dfs
+
+dataset generation:
+
+[] create dataset generation given (graph_type, nb_graphs, nb_nodes, algorithm_type)
+
