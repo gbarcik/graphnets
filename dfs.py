@@ -34,7 +34,7 @@ class DFS:
         E = nx.to_numpy_matrix(graph)
         x = self.initialize_x(graph, root)
         history = [x.copy()]
-        import pdb; pdb.set_trace()
+
         while np.max(x) > 0:
             x = self.iter_DFS(graph, x, E)
             history.append(x.copy())
