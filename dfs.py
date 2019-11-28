@@ -12,8 +12,8 @@ class DFS:
         pass
 
     def decode_last_state(self, x):
-        nb_seen = np.sum(np.where(x<0, 1, 0))
-        sort = np.argsort(np.where(x<0, -x, float('inf')))
+        nb_seen = np.sum(np.where(x < 0, 1, 0))
+        sort = np.argsort(np.where(x < 0, -x, float('inf')))
         sort[nb_seen:] = -1
         return sort
 
@@ -34,7 +34,7 @@ class DFS:
         E = nx.to_numpy_matrix(graph)
         x = self.initialize_x(graph, root)
         history = [x.copy()]
-
+        import pdb; pdb.set_trace()
         while np.max(x) > 0:
             x = self.iter_DFS(graph, x, E)
             history.append(x.copy())
@@ -83,7 +83,7 @@ class DFS:
 
         x[i0] = np.amin(x) - 1 # Mark node as seen. Implicitely encodes the position in which the node was seen
 
-        neigh = np.argwhere(E[i0]==1)[:,1] # Select the neighbours of this node
+        neigh = np.argwhere(E[i0] > 0)[:,1] # Select the neighbours of this node
 
         neigh = sorted(neigh, key=lambda id: graph.nodes[id]['priority'])
 
@@ -92,10 +92,8 @@ class DFS:
             if x[ind] >= 0: # Not == 0: we want to update the node's sons priority even if they are son of a shallower node
                 x[ind] = next_label # Mark the sons with highest rank, so that it is explored in priority
                 next_label += 1 # Update highest rank
-        #print(x)
+
         return x
-
-
 
 
 if __name__=="__main__":
@@ -107,21 +105,8 @@ if __name__=="__main__":
     dfs = DFS()
 
     hs, output = dfs.run(graph)
-    print(dfs.run(graph)[1])
-
-    #import pdb; pdb.set_trace()
-
-    E = nx.to_numpy_matrix(graph)
-    x = dfs.initialize_x(graph, root)
-    print(x)
-
-    while np.amax(x)>=0:
-        dfs.iter_DFS(graph, x,E)
-        print(x)
-#        time.sleep(5)
-        #clear_output()
-
-    print('DFS output: {}'.format(np.argsort(-x)))
+    print('dfs output: {}'.format(output))
+    print(hs)
 
     labels = dict((n, [n, np.around(d['priority'], decimals=2)]) for n, d in graph.nodes(data=True))
     nx.draw(graph, labels=labels)
