@@ -32,9 +32,15 @@ class GraphGenerator:
         if g is None:
             raise ValueError
         else:
+            # give a priority to each node
             priorities = {i: p for i, p in
                           enumerate(np.random.random(len(g.nodes)))}
             nx.set_node_attributes(g, priorities, name='priority')
+
+            # give a weight to each edge
+            weights = np.random.random(len(g.edges))
+            weights = {e: weights[i] for i, e in enumerate(g.edges)}
+            nx.set_edge_attributes(g, weights, 'weight')
             return g
 
 
