@@ -32,7 +32,7 @@ class Kahn:
         history = [x.copy()]
 
         while np.amin(x[:,2]) < 1:
-            print(x)
+            #print(x)
             x = self.iter_Kahn(graph, x, E)
             history.append(x.copy())
 
@@ -51,20 +51,29 @@ class Kahn:
         Initialized numpy representation of the graph, as used by our Kahn implementation
         '''
         E = nx.to_numpy_matrix(graph)
+        #print('E:', E)
         nb_nodes = graph.number_of_nodes()
 
         def get_degree(E, ind):
             return np.sum(E[:,ind])
 
         x = np.array([(get_degree(E,i), -1, -1) for i in range(nb_nodes)])
+        #print('x at initiallization:', x)
 
         # Labels will encode the order of execution
         label = 1
-        for i in range(len(x)):
-            if x[i][0] == 0:
-                x[i][1] = label
-                x[i][2] = 0
-                label += 1
+        
+        free_idx = np.argwhere(x[:,0]==0)
+        free_nodes = sorted([free_idx[i][0] for i in range(free_idx.size)], key=lambda id: graph.nodes[id]['priority'])
+
+        if not free_nodes.reverse():
+            print('No free nodes')
+            return x
+
+        for i in free_nodes:
+            x[i][1] = label
+            x[i][2] = 0
+            label += 1
 
         return x
 
@@ -98,10 +107,11 @@ class Kahn:
         # Set the node as seen
         x[node_to_free, 2] = 1
 
-        # Get all nodes the depend on its execution
+        # Get all nodes the depend on its execution, by order of priority 
         neigh = np.argwhere(E[node_to_free] == 1)
+        neigh = sorted([neigh[i][1] for i in range(neigh.shape[0])], key=lambda id: graph.nodes[id]['priority'])
 
-        for ind in neigh[:,1]:
+        for ind in neigh.reverse():
             # Decrease the number of constrain for the neighbour
             x[ind, 0] -= 1
 

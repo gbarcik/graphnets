@@ -6,7 +6,7 @@ class GraphGenerator:
     def __init__(self):
         pass
 
-    def gen_graph_type(self, nb_nodes, graph_type):
+    def gen_graph_type(self, nb_nodes, graph_type, set_weights=False):
         g = None
 
         if graph_type == 'ladder':
@@ -38,9 +38,10 @@ class GraphGenerator:
             nx.set_node_attributes(g, priorities, name='priority')
 
             # give a weight to each edge
-            weights = np.random.uniform(0.2, 1, len(g.edges))
-            weights = {e: weights[i] for i, e in enumerate(g.edges)}
-            nx.set_edge_attributes(g, weights, 'weight')
+            if set_weights:
+                weights = np.random.uniform(0.2, 1, len(g.edges))
+                weights = {e: weights[i] for i, e in enumerate(g.edges)}
+                nx.set_edge_attributes(g, weights, 'weight')
             return g
 
 
