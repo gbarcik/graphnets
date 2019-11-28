@@ -11,6 +11,11 @@ class DFS:
     def __init__(self):
         pass
 
+    def decode_last_state(self, x):
+        nb_seen = np.sum(np.where(x<0, 1, 0))
+        sort = np.argsort(np.where(x<0, -x, float('inf')))
+        sort[nb_seen:] = -1
+        return sort
 
     def run(self, graph, root=0):
         '''
@@ -30,11 +35,11 @@ class DFS:
         x = self.initialize_x(graph, root)
         history = [x.copy()]
 
-        while np.max(x) >= 0:
+        while np.max(x) > 0:
             x = self.iter_DFS(graph, x, E)
             history.append(x.copy())
 
-        return np.asarray(history), np.argsort(-x)
+        return np.asarray(history), self.decode_last_state(x)
 
 
     def initialize_x(self, graph, root=0):
@@ -84,11 +89,13 @@ class DFS:
 
         for ind in neigh:
             # If son was not explored, update it it
-            if x[ind] == 0:
+            if x[ind] >= 0: # Not == 0: we want to update the node's sons priority even if they are son of a shallower node
                 x[ind] = next_label # Mark the sons with highest rank, so that it is explored in priority
                 next_label += 1 # Update highest rank
-
+        #print(x)
         return x
+
+
 
 
 if __name__=="__main__":
@@ -102,17 +109,17 @@ if __name__=="__main__":
     hs, output = dfs.run(graph)
     print(dfs.run(graph)[1])
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     E = nx.to_numpy_matrix(graph)
-    x = prepare_x_DFS(graph, root)
+    x = dfs.initialize_x(graph, root)
     print(x)
 
     while np.amax(x)>=0:
-        iter_DFS(x,E)
+        dfs.iter_DFS(graph, x,E)
         print(x)
 #        time.sleep(5)
-        clear_output()
+        #clear_output()
 
     print('DFS output: {}'.format(np.argsort(-x)))
 
