@@ -25,24 +25,30 @@ class Dijkstra:
 
         Returns:
         --------
-        The history of x (states) when executing the Dijkstra algorithm, and
+        The history of x, p (states) when executing the Dijkstra algorithm, and
         the Dijkstra output
         '''
 
         E = nx.to_numpy_matrix(graph)
-        x = self.initialize_x(graph, root)
-        history = [x.copy()]
-        print(x)
+
+        # set infinity as sum(weights) + 1
+        inf = sum([w[2] for w in graph.edges.data('weight')]) + 1
+        print('inf set to be: {}'.format(inf))
+
+        x, p = self.initialize_states(graph, inf, root)
+
+        history = [x.copy(), p.copy()]
+
         # stop when the  smallest tentative distance among unvisited nodes +inf
-        while np.max(x[x[:, 0] == 1][:, 1]) < np.float('inf'):
-            x = self.iter_dijkstra(graph, x, E)
-            history.append(x.copy())
-            print(x)
+        while np.min(x[x[:, 0] == 1][:, 1], initial=inf) != inf:
+            x, p = self.iter_dijkstra(graph, x, p, E)
+            history.append((x.copy(), p.copy()))
+            print(x, p)
 
-        return np.asarray(history), self.decode_last_state(x)
+        return np.asarray(history)
 
 
-    def initialize_x(self, graph, root=0):
+    def initialize_states(self, graph, inf, root=0):
         '''
         Parameters
         ----------
@@ -54,17 +60,21 @@ class Dijkstra:
         --------
         Initialized numpy representation of the graph, as used by our Dijkstra implementation
         x[i] contains two fields (unvisited (bool), distance to source (float))
+        p[i] contain an integer that represents the previous node to get to i
         '''
 
         nb_nodes = graph.number_of_nodes()
         x = np.ones((nb_nodes, 2))
-        x[:, 1] = np.float('inf')
+        x[:, 1] = inf
         x[root] = [1, 0]
 
-        return x
+        p = -1 * np.ones(nb_nodes)
+        p[root] = root
+
+        return x, p
 
 
-    def iter_dijkstra(self, graph, x, E):
+    def iter_dijkstra(self, graph, x, p, E):
         '''
         Parameters
         ----------
@@ -72,43 +82,50 @@ class Dijkstra:
         array of the node's features.
         At initialization, x[i] should be 1 for the source node and 0 otherwise
         E: numpy array
-        adjacency matrix. E[i,j]=1 indicates a edge from node i to node j
+        adjacency matrix. E[i,j]>0 indicates a edge from node i to node j
 
         Returns
         -------
-        Modifies x, using our Dijkstra algorithm
+        Modifies x and p using our Dijkstra algorithm
         '''
+
         # minimum distance of unvisited nodes
         min_dist = np.min(x[x[:, 0] == 1][:, 1])
-        i0 = np.argwhre(x[:, 1] == min_dist)[0][0]
+        i0 = np.argwhere(x[:, 1] == min_dist)[0][0]
 
         # select the neighbours of this node
         neigh = np.argwhere(E[i0]>0)[:,1]
 
-        for ind in neigh:
+        for v in neigh:
             # update only unvisited nodes
-            if x[ind][0] == 1:
-                x[ind][1] = min(x[ind][1], E[i0, ind] + x[i0][1])
+            if x[v][0] == 1:
+                if E[i0, v] + x[i0][1] < x[v][1]:
+                    # x[v][1] = min(x[v][1], E[i0, v] + x[i0][1])
+                    x[v][1] = E[i0, v] + x[i0][1]
+                    p[v] = i0
 
         # mark current node as visited
         x[i0][0] = 0
 
-        return x
+        return x, p
 
 
 if __name__=="__main__":
     root= 2
     generator = GraphGenerator()
-    graph = generator.gen_graph_type(10, 'erdos_renyi')
+    graph = generator.gen_graph_type(5, 'erdos_renyi', set_weights=True)
 
     dijkstra = Dijkstra()
 
-    hs, output = dijkstra.run(graph)
-    print(dijkstra.run(graph)[1])
-
-    import pdb; pdb.set_trace()
+    hs = dijkstra.run(graph)
+    print(hs)
 
     labels = dict((n, [n, np.around(d['priority'], decimals=2)]) for n, d in graph.nodes(data=True))
     nx.draw(graph, labels=labels)
+    pos = nx.spring_layout(graph)
+    edges = nx.get_edge_attributes(graph, 'weight')
+    edges = {e: np.around(w, decimals=2) for e, w in edges.items()}
+    print(edges)
+
     plt.show()
 
