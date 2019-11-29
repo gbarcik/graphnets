@@ -12,7 +12,11 @@ class Kahn:
         pass
 
     def decode_last_state(self, x):
-        return x[:,1]
+        # argsort of the last iteration, with handeling of the unseen nodes
+        nb_seen = np.sum(np.where(x[:,0] < 0, 1, 0))
+        sort = np.argsort(np.where(x[:,0] < 0, -x[:,0], float('inf')))
+        sort[nb_seen:] = -1
+        return sort
 
     def run(self, graph):
         '''
@@ -31,8 +35,8 @@ class Kahn:
         x = self.initialize_x(graph)
         history = [x.copy()]
 
-        while np.amin(x[:,2]) < 1:
-            #print(x)
+        # Stopping condition is when no node can be processed
+        while np.any(np.isin(0, x[:,1])):
             x = self.iter_Kahn(graph, x, E)
             history.append(x.copy())
 
@@ -56,24 +60,18 @@ class Kahn:
         def get_degree(E, ind):
             return np.sum(E[:,ind])
 
-        x = np.array([(get_degree(E,i), -1, -1) for i in range(nb_nodes)])
-        #print('x at initiallization:', x)
+        x = np.array([(get_degree(E,i), -1) for i in range(nb_nodes)])
 
-        # Labels will encode the order of execution
-        label = 1
-        
+        # Nodes with degree 0 are the ones that can be executed right away        
         free_idx = np.argwhere(x[:,0]==0)
-        free_nodes = sorted([free_idx[i][0] for i in range(free_idx.size)], key=lambda id: graph.nodes[id]['priority'])
+        free_nodes = [free_idx[i][0] for i in range(free_idx.size)]
 
         if not free_nodes:
             print('No free nodes')
             return x
 
-        free_nodes.reverse()
         for i in free_nodes:
-            x[i][1] = label
-            x[i][2] = 0
-            label += 1
+            x[i][1] = 0
 
         return x
 
@@ -93,34 +91,28 @@ class Kahn:
         Modifies x, using our Kahn algorithm
         '''
 
-        next_label = np.amax(x[:,1]) + 1
+        available_nodes = np.argwhere(x[:,1]==0)
+    
+        # Getting the prioritary node
+        i0 = sorted([available_nodes[i][0] for i in range(available_nodes.size)], key=lambda id: graph.nodes[id]['priority'])[-1]
 
-        # If no node is free at the begining, problem cannot be solved
-        assert next_label >= 1
-
-        # Algorithm is stuck: interrupt iterations
-        if np.sum(np.where(x[:,2] == 0, 1, 0))==0:
-            x[:,2] = 1
-
-        node_to_free = np.argmin(np.where(x[:,2] == 0, x[:,1], float('inf')))
+        m = np.amin(x[:,0])
 
         # Set the node as seen
-        x[node_to_free, 2] = 1
+        x[i0, 1] = 1
+        # Store its execution time in the labels
+        x[i0, 0] = m-1
 
-        # Get all nodes the depend on its execution, by order of priority 
-        neigh = np.argwhere(E[node_to_free] == 1)
-        neigh = sorted([neigh[i][1] for i in range(neigh.shape[0])], key=lambda id: graph.nodes[id]['priority'])
+        # Get all nodes the depend on its execution
+        neigh = np.argwhere(E[i0] == 1)
 
-        neigh.reverse()
-        for ind in neigh:
-            # Decrease the number of constrain for the neighbour
+        for ind in neigh[:,1]:
+            # Decrease the degree
             x[ind, 0] -= 1
 
             if x[ind, 0] == 0:
-                # If the degree reaches zero, set a label to the node: it is ready to be processed
-                x[ind, 1] = next_label
-                x[ind, 2] = 0
-                next_label += 1
+                # If the degree reaches zero, set the node as able to be processed
+                x[ind, 1] = 0
 
         return x
 
@@ -144,11 +136,11 @@ if __name__=="__main__":
     x = kahn.initialize_x(graph)
     print(x)
 
-    while np.amin(x[:,2])<1:
+    while np.any(np.isin(0, x[:,1])):
         kahn.iter_Kahn(graph, x,E)
         print(x)
 
-    print('Kahn output: {}'.format(x[:,1]))
+    print('Kahn output: {}'.format(kahn.decode_last_state(x)))
 
     labels = dict((n, [n, np.around(d['priority'], decimals=2)]) for n, d in graph.nodes(data=True))
     nx.draw(graph, labels=labels)
