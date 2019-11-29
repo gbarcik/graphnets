@@ -9,6 +9,9 @@ class GraphGenerator:
     def gen_graph_type(self, nb_nodes, graph_type, set_weights=False):
         g = None
 
+        if graph_type == 'gn_graph':
+            g = nx.gn_graph(nb_nodes)
+
         if graph_type == 'ladder':
             g = nx.ladder_graph(nb_nodes)
 

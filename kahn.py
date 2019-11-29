@@ -51,7 +51,6 @@ class Kahn:
         Initialized numpy representation of the graph, as used by our Kahn implementation
         '''
         E = nx.to_numpy_matrix(graph)
-        #print('E:', E)
         nb_nodes = graph.number_of_nodes()
 
         def get_degree(E, ind):
@@ -66,10 +65,11 @@ class Kahn:
         free_idx = np.argwhere(x[:,0]==0)
         free_nodes = sorted([free_idx[i][0] for i in range(free_idx.size)], key=lambda id: graph.nodes[id]['priority'])
 
-        if not free_nodes.reverse():
+        if not free_nodes:
             print('No free nodes')
             return x
 
+        free_nodes.reverse()
         for i in free_nodes:
             x[i][1] = label
             x[i][2] = 0
@@ -111,7 +111,8 @@ class Kahn:
         neigh = np.argwhere(E[node_to_free] == 1)
         neigh = sorted([neigh[i][1] for i in range(neigh.shape[0])], key=lambda id: graph.nodes[id]['priority'])
 
-        for ind in neigh.reverse():
+        neigh.reverse()
+        for ind in neigh:
             # Decrease the number of constrain for the neighbour
             x[ind, 0] -= 1
 
@@ -128,7 +129,11 @@ if __name__=="__main__":
     # graph = nx.balanced_tree(2,3)
     root= 2
     generator = GraphGenerator()
-    graph = generator.gen_graph_type(10, 'erdos_renyi')
+
+    # Ensure that we generate a directed acyclic graph
+    graph = generator.gen_graph_type(10, 'gn_graph')
+    print(nx.to_numpy_matrix(graph))
+        
 
     kahn = Kahn()
 
