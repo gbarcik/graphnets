@@ -15,7 +15,7 @@ class DatasetGenerator:
         dataset = []
 
         for _ in range(nb_graphs):
-
+            
             if algorithm_type == 'DFS':
                 dfs = DFS()
                 graph = self.graph_generator.gen_graph_type(nb_nodes, graph_type)

@@ -87,7 +87,9 @@ class DFS:
 
         neigh = sorted(neigh, key=lambda id: graph.nodes[id]['priority'])
 
-        for ind in neigh.reverse():
+        neigh.reverse()
+
+        for ind in neigh:
             # If son was not explored, update it it
             if x[ind] >= 0: # Not == 0: we want to update the node's sons priority even if they are son of a shallower node
                 x[ind] = next_label # Mark the sons with highest rank, so that it is explored in priority
