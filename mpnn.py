@@ -39,10 +39,10 @@ class MPNN(nn.Module):
         # The argument is a batch of edges.
         # This computes a (batch of) message called 'msg' using the source node's feature 'h'.
         z_src = edges.src['z']
-        print('z_src shape:', z_src.size())
+        #print('z_src shape:', z_src.size())
         z_dst = edges.dst['z']
-        print('z_src shape:', z_dst.size())
-        print('edges features shape:', edges.data['features'].view(-1,1).size())
+        #print('z_src shape:', z_dst.size())
+        #print('edges features shape:', edges.data['features'].view(-1,1).size())
 
         msg = self.M(torch.cat([z_src, z_dst, edges.data['features'].view(-1,1)], 1))
         return {'msg' : msg}
@@ -64,23 +64,23 @@ class MPNN(nn.Module):
 
         # Encoding x^t and h^{t-1}
         inputs = inputs.view(-1,1)
-        print('Input size in step:', inputs.size())
-        print('hidden size in step:', hidden.size())
+        #print('Input size in step:', inputs.size())
+        #print('hidden size in step:', hidden.size())
         inp = torch.cat([inputs, hidden], 1)
-        print('concat size in step:', inp.size())
+        #print('concat size in step:', inp.size())
         z = self.encoder(inp)
         graph.ndata['z'] = z
 
         # stack z and edges
-        '''print('first z size:', torch.index_select(z, 0, id1).size())
-        print('second z size:', torch.index_select(z, 0, id2).size())
+        '''#print('first z size:', torch.index_select(z, 0, id1).size())
+        #print('second z size:', torch.index_select(z, 0, id2).size())
         flat_edges = edges_mat.view(edges_mat.size(0)**2, 1)
-        print('flat_edges size:', flat_edges.size())
+        #print('flat_edges size:', flat_edges.size())
         stack = torch.cat([
                 torch.index_select(z, 0, id1),
                 torch.index_select(z, 0, id2),
                 flat_edges], 1)
-        print('size of stack:', stack.size())'''
+        #print('size of stack:', stack.size())'''
 
         # Processor
         # without dgl: messages = self.M(stack) but hard to pass on messages
@@ -89,24 +89,27 @@ class MPNN(nn.Module):
         graph.send(graph.edges(), lambda x: self.compute_send_messages(x, edges_mat))
         # trigger aggregation at all nodes
         graph.recv(graph.nodes(), self.max_reduce_messages)
-        print('size of z:', z.size())
+        #print('size of z:', z.size())
         u_input = graph.ndata.pop('u_input')
-        print('size of u_input:', u_input.size())
+        #print('size of u_input:', u_input.size())
         new_hidden = self.U(torch.cat([z, u_input], 1))
 
         # Stoping criterion for the next step
         H_mean = torch.mean(new_hidden, dim=0, keepdim=True)
-        '''print('H_mean size:', H_mean.size())
+        '''#print('H_mean size:', H_mean.size())
         H_mean_shaped = H_mean.expand(new_hidden.size(0), -1)'''
         # For now only use H_mean as the expected broadcast is unclear
         loc_inp= H_mean#torch.cat([new_hidden, H_mean_shaped], 1)
-        print('loc_inp size:', loc_inp.size())
+        #print('loc_inp size:', loc_inp.size())
         loc_out = self.termination(loc_inp)
-        print('loc_out size:', loc_out.size())
-        stop = nn.Sigmoid(loc_out[0][0])
+        #print('loc_out size:', loc_out.size())
+        m = nn.Sigmoid()
+        stop = m(loc_out)
+        #print('stop size:', stop.size())
 
         # Decoder
         new_state = self.decoder(torch.cat([new_hidden, z], 1))
+        #print('new_state size:', new_state.size())
 
         return new_state, new_hidden, stop
         
@@ -116,11 +119,11 @@ class MPNN(nn.Module):
         
         # Initialize hidden state at zero
         hidden = torch.zeros(states.size(1), self.n_hid).float()#.cuda()
-        print('Shape of hidden state:', hidden.size())
+        #print('Shape of hidden state:', hidden.size())
 
         # Store states and termination prediction
-        pred_all = [states[0].float()]
-        pred_stop = [0]
+        pred_all = [states[0].view(-1,1).float()]
+        pred_stop = [torch.tensor([[0]]).float()]
         # set all edges features inside graph (for easier message passing)
         edges_features = []
         for i in range(graph.edges()[0].size(0)):
@@ -128,14 +131,15 @@ class MPNN(nn.Module):
             edges_features.append(edges_mat[graph.edges()[0][i], graph.edges()[1][i]])
         graph.edata['features'] = torch.FloatTensor(edges_features)
 
-        print('Shape of input state:', pred_all[0].size())
+        #print('Shape of input state:', pred_all[0].size())
 
         # Iterate the algorithm for all steps
-        for i in range(states.size(0)):
+        for i in range(states.size(0)-1):
             new_state, hidden, stop = self.step(graph, pred_all[i], edges_mat.float(), hidden)
 
             pred_all.append(new_state)
             pred_stop.append(stop)
+            #print(pred_stop)
         
         preds = torch.stack(pred_all, dim=1)
         preds_stop = torch.stack(pred_stop, dim=1)

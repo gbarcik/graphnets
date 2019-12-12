@@ -65,7 +65,7 @@ def nll_gaussian(preds, target):
     neg_log_p = ((preds - target) ** 2)
     return neg_log_p.sum() / (target.size(0) * target.size(1))
 
-verbose = True
+verbose = False
 
 for epoch in range(nb_epochs):
     print('Epoch:', epoch)
@@ -103,7 +103,8 @@ for epoch in range(nb_epochs):
         # What exatly do we want as input?
         preds, pred_stops = model(graph, states, edges_mat)
 
-        loss = nll_gaussian(preds, states) + ((pred_stops-termination)**2).sum()/max_steps # MSE of output and states + termination loss
+        loss = nll_gaussian(preds, states)
+        loss += ((pred_stops-torch.from_numpy(termination))**2).sum()/max_steps # MSE of output and states + termination loss
 
         optimizer.zero_grad()
         loss.backward()
@@ -113,4 +114,4 @@ for epoch in range(nb_epochs):
 
     print('Epoch run in:', time.time()-start)
     clock = time.time()
-    print(mean(losses))
+    print(np.mean(np.asarray(losses)))
