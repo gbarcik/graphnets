@@ -35,7 +35,7 @@ class MPNN(nn.Module):
         self.decoder = Linear_layer(hidden_feats * 2 , in_feats)
         self.termination = Linear_layer(hidden_feats , 1) # Find a way to have only 2 outputs whatever the graph size is
 
-    def compute_send_messages(self, edges, edges_mat):
+    def compute_send_messages(self, edges):
         # The argument is a batch of edges.
         # This computes a (batch of) message called 'msg' using the source node's feature 'h'.
         z_src = edges.src['z']
@@ -55,10 +55,10 @@ class MPNN(nn.Module):
 
     # A step corresponds to 1 iteration of the network:
     # Giving the state of the graph after one iteration of the algrithm
-    def step(self, graph, inputs, edges_mat, hidden):
+    def step(self, graph, inputs, hidden):
         
         # Helpers to stack conviniently z and e
-        n_atoms = edges_mat.size(0)
+        n_atoms = inputs.size(0)
         id1 = torch.LongTensor(sum([[i] * n_atoms for i in range(n_atoms)], []))
         id2 = torch.LongTensor(sum([list(range(n_atoms)) for i in range(n_atoms)], []))
 
@@ -86,7 +86,7 @@ class MPNN(nn.Module):
         # without dgl: messages = self.M(stack) but hard to pass on messages
         # Extract the aggregation(max) of messages at each position
         # Easier with DGL:
-        graph.send(graph.edges(), lambda x: self.compute_send_messages(x, edges_mat))
+        graph.send(graph.edges(), self.compute_send_messages)
         # trigger aggregation at all nodes
         graph.recv(graph.nodes(), self.max_reduce_messages)
         #print('size of z:', z.size())
@@ -135,7 +135,7 @@ class MPNN(nn.Module):
 
         # Iterate the algorithm for all steps
         for i in range(states.size(0)-1):
-            new_state, hidden, stop = self.step(graph, pred_all[i], edges_mat.float(), hidden)
+            new_state, hidden, stop = self.step(graph, pred_all[i], hidden)
 
             pred_all.append(new_state)
             pred_stop.append(stop)

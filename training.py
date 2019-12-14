@@ -22,7 +22,7 @@ random.seed(33)
 # For the training hyperparameters, insire from paper
 nb_epochs = 10
 nb_features = 32
-lr = 0.0005
+lr = 0.05
 
 # Datasets parameters
 graph_type = 'erdos_renyi'
@@ -41,6 +41,10 @@ start = time.time()
 data_gen = DatasetGenerator()
 graphs, history_dataset = data_gen.run(graph_type, nb_graphs, nb_nodes,
                                 algorithm_type)
+
+#print(history_dataset[:5])
+
+#print(history_dataset[5000])
 
 print('Dataset created in:', time.time()-start)
 clock = time.time()
@@ -103,6 +107,12 @@ for epoch in range(nb_epochs):
         # What exatly do we want as input?
         preds, pred_stops = model(graph, states, edges_mat)
 
+        if i==1:
+            print('states:', states)
+            print('pred:', preds)
+            print('termination:', termination)
+            print('pred_stops:', pred_stops)
+
         loss = nll_gaussian(preds, states)
         loss += ((pred_stops-torch.from_numpy(termination))**2).sum()/max_steps # MSE of output and states + termination loss
 
@@ -112,6 +122,6 @@ for epoch in range(nb_epochs):
 
         losses.append(loss.item())
 
-    print('Epoch run in:', time.time()-start)
+    print('Epoch run in:', time.time()-clock)
     clock = time.time()
     print(np.mean(np.asarray(losses)))
