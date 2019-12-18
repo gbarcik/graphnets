@@ -15,6 +15,8 @@ import numpy as np
 import random
 random.seed(33)
 
+use_cuda = torch.cuda.is_available()
+
 #####################################################
 # --- Training parameters
 #####################################################
@@ -54,6 +56,38 @@ for i in range(10):
     pass
     #print(history_dataset[i].shape)
 
+# Prepare the data in an easily exploitable format
+# It could probably be optimised with DGL
+
+terminations = []
+edges_mats = []
+
+for i in range(nb_graphs):
+    states = history_dataset[i]
+    termination = np.zeros(states.shape[0])
+    termination[-1] = 1
+    assert max_steps >= states.shape[0]
+    # set states to fixed lenght with termination boolean to be able to compute termination error
+    if states.shape[0] < max_steps:
+        pad_idx = [(0,0) for i in range(states.ndim)]
+        pad_idx[0] = (0, max_steps-states.shape[0])
+        states = np.pad(states, pad_idx, 'edge')
+        termination = np.pad(termination, (0, max_steps-termination.size), 'constant', constant_values=(1))
+    history_dataset[i] = states
+    terminations.append(termination)
+    edges_mats.append(nx.to_numpy_matrix(graphs[i]))
+    graphs[i] = dgl.DGLGraph(graphs[i])
+
+# Take 10% of the graphs as validation
+nb_val = int(0.1*nb_graphs)
+
+train_data = [(graphs[i], edges_mats[i], history_dataset[i], terminations[i]) for i in range(nb_graphs-nb_val)]
+test_data = [(graphs[i], edges_mats[i], history_dataset[i], terminations[i]) for i in range(nb_graphs-nb_val, nb_graphs)]
+
+# Data loaders do not seem to be compatible with DGL
+#train_loader = torch.utils.data.DataLoader(train_data)
+#train_loader = torch.utils.data.DataLoader(test_data)
+
 # dataset is an array of size batch size
 # each idem is a history of shape (nb_steps, nb_nodes)
 # We now have in our possession a full dataset on which to train
@@ -61,8 +95,15 @@ for i in range(10):
 
 ###################################################
 
-model = MPNN(1, 32, 1, 1)
+model = MPNN(1, 32, 1, 1, useCuda=use_cuda)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+
+if use_cuda:
+    print('Using GPU')
+    model.cuda()
+else:
+    print('Using CPU')
+
 model.train()
 
 def nll_gaussian(preds, target):
@@ -77,26 +118,17 @@ for epoch in range(nb_epochs):
     losses = []
     clock = time.time()
 
-    for i in range(nb_graphs):
+    for batch_idx, (graph, edges_mat, states, termination) in enumerate(train_data):
         if verbose: print('--- Processing new graph! ---')
 
         # We do optimizer call only after completely processing the graph
-        graph, states = graphs[i], history_dataset[i]
+        #graph, states = graphs[i], history_dataset[i]
         # extract adjacency matrix
-        edges_mat = nx.to_numpy_matrix(graph)
+        #edges_mat = nx.to_numpy_matrix(graph)
         if verbose: print('edges_mat shape:', edges_mat.shape)
         # Convert graph to DGL
-        graph = dgl.DGLGraph(graph)
+        #graph = dgl.DGLGraph(graph)
 
-        # set states to fixed lenght with termination boolean to be able to compute termination error
-        termination = np.zeros(states.shape[0])
-        termination[-1] = 1
-        assert max_steps >= states.shape[0]
-        if states.shape[0]<max_steps:
-            pad_idx = [(0,0) for i in range(states.ndim)]
-            pad_idx[0] = (0, max_steps-states.shape[0])
-            states = np.pad(states, pad_idx, 'edge')
-            termination = np.pad(termination, (0, max_steps-termination.size), 'constant', constant_values=(1))
 
         if verbose: print('states shape (after reshape):', states.shape)
         if verbose: print('termination shape (after reshape):', termination.shape)
@@ -105,16 +137,22 @@ for epoch in range(nb_epochs):
         edges_mat = torch.from_numpy(edges_mat)
 
         # What exatly do we want as input?
+
+        termination = torch.from_numpy(termination)
+
+        if use_cuda:
+            states, edges_mat, termination = states.cuda(), edges_mat.cuda(), termination.cuda()
+        
         preds, pred_stops = model(graph, states, edges_mat)
 
-        if i==1:
+        '''if batch_idx==1:
             print('states:', states)
             print('pred:', preds)
             print('termination:', termination)
-            print('pred_stops:', pred_stops)
+            print('pred_stops:', pred_stops)'''
 
         loss = nll_gaussian(preds, states)
-        loss += ((pred_stops-torch.from_numpy(termination))**2).sum()/max_steps # MSE of output and states + termination loss
+        loss += ((pred_stops-termination)**2).sum()/max_steps # MSE of output and states + termination loss
 
         optimizer.zero_grad()
         loss.backward()

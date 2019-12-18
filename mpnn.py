@@ -26,14 +26,15 @@ class Linear_layer(nn.Module):
 # !! Implemented with sum of received messages TODO: set max instead
 class MPNN(nn.Module):
     # Expects dgl graphs as inputs
-    def __init__(self, in_feats, hidden_feats, edge_feats, out_feats):
+    def __init__(self, in_feats, hidden_feats, edge_feats, out_feats, useCuda=False):
         super(MPNN, self).__init__()
         self.n_hid = hidden_feats
         self.encoder = Linear_layer(in_feats + hidden_feats, hidden_feats)
-        self.M = Linear_layer( hidden_feats * 2 + edge_feats, 32) # dimension is one here so that max has a sens
+        self.M = Linear_layer( hidden_feats * 2 + edge_feats, 32) # if use of max, dimension has to be 1?
         self.U = Linear_layer(hidden_feats * 2 , hidden_feats)
         self.decoder = Linear_layer(hidden_feats * 2 , in_feats)
         self.termination = Linear_layer(hidden_feats , 1) # Find a way to have only 2 outputs whatever the graph size is
+        self.useCuda = useCuda
 
     def compute_send_messages(self, edges):
         # The argument is a batch of edges.
@@ -50,7 +51,8 @@ class MPNN(nn.Module):
     def max_reduce_messages(self, nodes):
         # The argument is a batch of nodes.
         # This computes the new 'h' features by summing received 'msg' in each node's mailbox.
-        return {'u_input' : torch.sum(nodes.mailbox['msg'], dim=1)} # for sum and mean: add ''
+        #return {'u_input' : torch.sum(nodes.mailbox['msg'], dim=1)} # for sum and mean: add ''
+        return {'u_input' : torch.max(nodes.mailbox['msg'], dim=1).values}
 
 
     # A step corresponds to 1 iteration of the network:
@@ -118,7 +120,8 @@ class MPNN(nn.Module):
     def forward(self, graph, states, edges_mat):
         
         # Initialize hidden state at zero
-        hidden = torch.zeros(states.size(1), self.n_hid).float()#.cuda()
+        hidden = torch.zeros(states.size(1), self.n_hid).float()
+        if self.useCuda: hidden = hidden.cuda() # Only activate cuda if enabled
         #print('Shape of hidden state:', hidden.size())
 
         # Store states and termination prediction
@@ -130,6 +133,10 @@ class MPNN(nn.Module):
             # Extract the features of each existing edge
             edges_features.append(edges_mat[graph.edges()[0][i], graph.edges()[1][i]])
         graph.edata['features'] = torch.FloatTensor(edges_features)
+        if self.useCuda:
+            graph.edata['features'] = graph.edata['features'].cuda()
+            hidden = hidden.cuda()
+            pred_stop = [torch.tensor([[0]]).float().cuda()]
 
         #print('Shape of input state:', pred_all[0].size())
 
