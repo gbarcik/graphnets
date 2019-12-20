@@ -22,9 +22,9 @@ use_cuda = torch.cuda.is_available()
 #####################################################
 
 # For the training hyperparameters, insire from paper
-nb_epochs = 10
+nb_epochs = 20
 nb_features = 32
-lr = 0.01
+lr = 0.005
 
 # Datasets parameters
 graph_type = 'erdos_renyi'
@@ -81,7 +81,9 @@ for i in range(nb_graphs):
     history_dataset[i] = states
     terminations.append(termination)
     edges_mats.append(nx.to_numpy_matrix(graphs[i]))
-    graphs[i] = dgl.DGLGraph(graphs[i])
+    g = dgl.DGLGraph()
+    g.from_networkx(graphs[i], node_attrs=['priority'])
+    graphs[i] = g
 
 # Take 10% of the graphs as validation
 nb_val = int(0.1*nb_graphs)

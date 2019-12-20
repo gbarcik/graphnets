@@ -29,8 +29,8 @@ class MPNN(nn.Module):
     def __init__(self, in_feats, hidden_feats, edge_feats, out_feats, useCuda=False):
         super(MPNN, self).__init__()
         self.n_hid = hidden_feats
-        self.encoder = Linear_layer(in_feats + hidden_feats, hidden_feats)
-        self.M = Linear_layer( hidden_feats * 2 + edge_feats, 32) # if use of max, dimension has to be 1?
+        self.encoder = Linear_layer(in_feats + hidden_feats +1, hidden_feats) # +1 is for the weights (needed so far, might be removed later)
+        self.M = Linear_layer( hidden_feats * 2 + edge_feats, 32)
         self.U = Linear_layer(hidden_feats * 2 , hidden_feats)
         self.decoder = Linear_layer(hidden_feats * 2 , in_feats)
         self.termination = Linear_layer(hidden_feats , 1) # Find a way to have only 2 outputs whatever the graph size is
@@ -68,7 +68,8 @@ class MPNN(nn.Module):
         inputs = inputs.view(-1,1)
         #print('Input size in step:', inputs.size())
         #print('hidden size in step:', hidden.size())
-        inp = torch.cat([inputs, hidden], 1)
+        #print('priority size in step:', graph.ndata['priority'].size())
+        inp = torch.cat([inputs, hidden, graph.ndata['priority'].view(-1,1)], 1)
         #print('concat size in step:', inp.size())
         z = self.encoder(inp)
         graph.ndata['z'] = z
@@ -127,6 +128,7 @@ class MPNN(nn.Module):
         # Store states and termination prediction
         pred_all = [states[0].view(-1,1).float()]
         pred_stop = [torch.tensor([[0]]).float()]
+
         # set all edges features inside graph (for easier message passing)
         edges_features = []
         for i in range(graph.edges()[0].size(0)):
@@ -135,6 +137,7 @@ class MPNN(nn.Module):
         graph.edata['features'] = torch.FloatTensor(edges_features)
         if self.useCuda:
             graph.edata['features'] = graph.edata['features'].cuda()
+            graph.ndata['priority'] = graph.ndata['priority'].cuda()
             hidden = hidden.cuda()
             pred_stop = [torch.tensor([[0]]).float().cuda()]
 
