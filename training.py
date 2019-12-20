@@ -24,7 +24,7 @@ use_cuda = torch.cuda.is_available()
 # For the training hyperparameters, insire from paper
 nb_epochs = 10
 nb_features = 32
-lr = 0.05
+lr = 0.01
 
 # Datasets parameters
 graph_type = 'erdos_renyi'
@@ -33,7 +33,7 @@ nb_nodes = 20
 algorithm_type = 'DFS'
 
 max_steps = nb_nodes + 1 # maximum number of steps before stopping
-# I added +1 as experimentally the case happends, t investigate
+# I added +1 as experimentally the case happends, to investigate
 
 ####################################################
 # --- Data generation
@@ -62,10 +62,15 @@ for i in range(10):
 terminations = []
 edges_mats = []
 
+# Do all the necessary transforms on the data
 for i in range(nb_graphs):
     states = history_dataset[i]
     termination = np.zeros(states.shape[0])
     termination[-1] = 1
+    # Adding self edge to every node, as in the paper
+    '''for j in range(nb_nodes):
+        graphs[i].add_edge(j, j)'''
+
     assert max_steps >= states.shape[0]
     # set states to fixed lenght with termination boolean to be able to compute termination error
     if states.shape[0] < max_steps:
@@ -96,7 +101,7 @@ test_data = [(graphs[i], edges_mats[i], history_dataset[i], terminations[i]) for
 ###################################################
 
 model = MPNN(1, 32, 1, 1, useCuda=use_cuda)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
+optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 if use_cuda:
     print('Using GPU')
@@ -151,7 +156,10 @@ for epoch in range(nb_epochs):
             print('termination:', termination)
             print('pred_stops:', pred_stops)'''
 
-        loss = nll_gaussian(preds, states)
+        #print(preds.size())
+        #print(states.size())
+
+        loss = nll_gaussian(preds, torch.t(states))
         loss += ((pred_stops-termination)**2).sum()/max_steps # MSE of output and states + termination loss
 
         optimizer.zero_grad()
@@ -162,4 +170,9 @@ for epoch in range(nb_epochs):
 
     print('Epoch run in:', time.time()-clock)
     clock = time.time()
-    print(np.mean(np.asarray(losses)))
+    print('Loss:', np.mean(np.asarray(losses)))
+
+print('states:', states)
+print('pred:', torch.t(preds))
+print('termination:', termination)
+print('pred_stops:', pred_stops)

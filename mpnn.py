@@ -101,6 +101,7 @@ class MPNN(nn.Module):
         '''#print('H_mean size:', H_mean.size())
         H_mean_shaped = H_mean.expand(new_hidden.size(0), -1)'''
         # For now only use H_mean as the expected broadcast is unclear
+        # TODO: find right way to broadcast
         loc_inp= H_mean#torch.cat([new_hidden, H_mean_shaped], 1)
         #print('loc_inp size:', loc_inp.size())
         loc_out = self.termination(loc_inp)
@@ -121,7 +122,6 @@ class MPNN(nn.Module):
         
         # Initialize hidden state at zero
         hidden = torch.zeros(states.size(1), self.n_hid).float()
-        if self.useCuda: hidden = hidden.cuda() # Only activate cuda if enabled
         #print('Shape of hidden state:', hidden.size())
 
         # Store states and termination prediction
@@ -148,7 +148,9 @@ class MPNN(nn.Module):
             pred_stop.append(stop)
             #print(pred_stop)
         
-        preds = torch.stack(pred_all, dim=1)
+        #print(pred_all[0].size())
+        preds = torch.stack(pred_all, dim=1).view(states.size(0)-1,states.size(0))
+        #print(preds.size())
         preds_stop = torch.stack(pred_stop, dim=1)
 
         return preds, preds_stop
