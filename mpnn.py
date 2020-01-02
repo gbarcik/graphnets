@@ -7,6 +7,10 @@ from generate_dataset import DatasetGenerator
 import torch
 import torch.nn as nn
 
+# Setting the seed for replicability
+import random
+random.seed(33)
+
 # Do not use DGL in the end?
 
 # Define the linear projection module
@@ -110,6 +114,7 @@ class MPNN(nn.Module):
         # Store states and termination prediction
         pred_all = [states[0].view(-1,1).float()]
         pred_stop = [torch.tensor([[0]]).float()]
+        pred_nextnode = []
 
         # set all edges features inside graph (for easier message passing)
         edges_features = []
@@ -129,10 +134,15 @@ class MPNN(nn.Module):
         for i in range(states.size(0)-1):
             new_state, hidden, stop, next_node_energy = self.step(graph, pred_all[i], hidden)
 
+            next_node_pred = nn.Softmax(dim=0)(next_node_energy)
+
             pred_all.append(new_state)
             pred_stop.append(stop)
+            pred_nextnode.append(next_node_pred)
         
         preds = torch.stack(pred_all, dim=1).view(states.size(0)-1,states.size(0))
         preds_stop = torch.stack(pred_stop, dim=1)
+        preds_nextnode = torch.stack(pred_nextnode, dim=1)
+        
 
-        return preds, preds_stop
+        return preds, preds_stop, preds_nextnode

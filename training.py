@@ -56,6 +56,7 @@ edges_mats = []
 # Do all the necessary transforms on the data
 for i in range(nb_graphs):
     states = history_dataset[i]
+    nextnode_data = next_nodes[i]
     termination = np.zeros(states.shape[0])
     termination[-1] = 1
     
@@ -70,8 +71,12 @@ for i in range(nb_graphs):
         pad_idx = [(0,0) for i in range(states.ndim)]
         pad_idx[0] = (0, max_steps-states.shape[0])
         states = np.pad(states, pad_idx, 'edge')
+        nextnode_data = np.pad(nextnode_data, pad_idx, 'edge')
         termination = np.pad(termination, (0, max_steps-termination.size), 'constant', constant_values=(1))
     history_dataset[i] = states
+    # For nn.CrossEntroppyLoss, next node is expected to be an index and not 1 hot
+    nextnode_data = np.argmax(nextnode_data, axis=1)
+    next_nodes[i] = nextnode_data
     terminations.append(termination)
     edges_mats.append(nx.to_numpy_matrix(graphs[i]))
     g = dgl.DGLGraph()
@@ -81,8 +86,8 @@ for i in range(nb_graphs):
 # Take 10% of the graphs as validation
 nb_val = int(0.1*nb_graphs)
 
-train_data = [(graphs[i], edges_mats[i], history_dataset[i], terminations[i]) for i in range(nb_graphs-nb_val)]
-test_data = [(graphs[i], edges_mats[i], history_dataset[i], terminations[i]) for i in range(nb_graphs-nb_val, nb_graphs)]
+train_data = [(graphs[i], edges_mats[i], history_dataset[i], terminations[i], next_nodes[i]) for i in range(nb_graphs-nb_val)]
+test_data = [(graphs[i], edges_mats[i], history_dataset[i], terminations[i], next_nodes[i]) for i in range(nb_graphs-nb_val, nb_graphs)]
 
 # Data loaders do not seem to be compatible with DGL
 #train_loader = torch.utils.data.DataLoader(train_data)
@@ -118,7 +123,7 @@ for epoch in range(nb_epochs):
     losses = []
     clock = time.time()
 
-    for batch_idx, (graph, edges_mat, states, termination) in enumerate(train_data):
+    for batch_idx, (graph, edges_mat, states, termination, nextnodes_mat) in enumerate(train_data):
         if verbose: print('--- Processing new graph! ---')
 
         # We do optimizer call only after completely processing the graph
@@ -136,13 +141,19 @@ for epoch in range(nb_epochs):
         states = torch.from_numpy(states)
         edges_mat = torch.from_numpy(edges_mat)
         termination = torch.from_numpy(termination)
+        nextnodes_mat = torch.from_numpy(nextnodes_mat)
 
         if use_cuda:
-            states, edges_mat, termination = states.cuda(), edges_mat.cuda(), termination.cuda()
+            states, edges_mat, termination, nextnodes_mat = states.cuda(), edges_mat.cuda(), termination.cuda(), nextnodes_mat.cuda()
         
-        preds, pred_stops = model(graph, states, edges_mat)
+        preds, pred_stops, pred_nextnodes = model(graph, states, edges_mat)
+
+        #print('true', nextnodes_mat.size())
+        pred_nextnodes = pred_nextnodes.view(-1, pred_nextnodes.size()[0])
+        #print('pred', pred_nextnodes.size())
 
         loss = nll_gaussian(preds, torch.t(states))
+        loss += nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat)
         loss += ((pred_stops-termination)**2).sum()/max_steps # MSE of output and states + termination loss
 
         optimizer.zero_grad()

@@ -39,5 +39,5 @@ if __name__ == '__main__':
     graphs, dataset, next_nodes = data_gen.run(graph_type, nb_graphs, nb_nodes,
                                   algorithm_type)
 
-    print(dataset, next_nodes)
+    print(dataset, [np.argmax(next_node, axis=1) for next_node in next_nodes])
 
