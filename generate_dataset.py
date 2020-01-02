@@ -13,6 +13,7 @@ class DatasetGenerator:
     def run(self, graph_type, nb_graphs, nb_nodes, algorithm_type):
         graphs = []
         dataset = []
+        next_nodes = []
 
         for _ in range(nb_graphs):
             
@@ -22,8 +23,10 @@ class DatasetGenerator:
                 graphs.append(graph)
                 history, _ = dfs.run(graph)
                 dataset.append(history)
+                # Generate the "next node" data
+                next_nodes.append(np.asarray([np.where(history[i]-history[i+1]>0, 1, 0) for i in range(history.shape[0]-1)]))
 
-        return graphs, np.asarray(dataset)
+        return graphs, np.asarray(dataset), np.asarray(next_nodes)
 
 
 if __name__ == '__main__':
@@ -33,8 +36,8 @@ if __name__ == '__main__':
     algorithm_type = 'DFS'
 
     data_gen = DatasetGenerator()
-    graphs, dataset = data_gen.run(graph_type, nb_graphs, nb_nodes,
+    graphs, dataset, next_nodes = data_gen.run(graph_type, nb_graphs, nb_nodes,
                                   algorithm_type)
 
-    print(dataset)
+    print(dataset, next_nodes)
 
