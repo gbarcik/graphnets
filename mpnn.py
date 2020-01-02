@@ -134,7 +134,7 @@ class MPNN(nn.Module):
         for i in range(states.size(0)-1):
             new_state, hidden, stop, next_node_energy = self.step(graph, pred_all[i], hidden)
 
-            next_node_pred = nn.Softmax(dim=0)(next_node_energy)
+            next_node_pred = next_node_energy#nn.Softmax(dim=0)(next_node_energy) # Softmax is already done in CrossEntropyLoss from Pytorch?
 
             pred_all.append(new_state)
             pred_stop.append(stop)

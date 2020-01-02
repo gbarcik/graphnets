@@ -61,8 +61,8 @@ for i in range(nb_graphs):
     termination[-1] = 1
     
     # TODO?: Adding self edge to every node, as in the paper
-    '''for j in range(nb_nodes):
-        graphs[i].add_edge(j, j)'''
+    for j in range(nb_nodes):
+        graphs[i].add_edge(j, j)
 
     assert max_steps >= states.shape[0]
 
@@ -152,9 +152,15 @@ for epoch in range(nb_epochs):
         pred_nextnodes = pred_nextnodes.view(-1, pred_nextnodes.size()[0])
         #print('pred', pred_nextnodes.size())
 
+        # Compare the components of the loss for tuning
         loss = nll_gaussian(preds, torch.t(states))
-        loss += nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat)
+        print('prediction loss:', nll_gaussian(preds, torch.t(states)))
+        loss += 100* nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat)
+        print('Next node prediction loss:', nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat))
+        print('pred_nextnodes', pred_nextnodes)
+        print('nextnodes_mat', nextnodes_mat)
         loss += ((pred_stops-termination)**2).sum()/max_steps # MSE of output and states + termination loss
+        print('termination loss:', ((pred_stops-termination)**2).sum()/max_steps)
 
         optimizer.zero_grad()
         loss.backward()
