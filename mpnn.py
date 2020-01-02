@@ -32,8 +32,10 @@ class MPNN(nn.Module):
         self.encoder = Linear_layer(in_feats + hidden_feats +1, hidden_feats) # +1 is for the weights (needed so far, might be removed later)
         self.M = Linear_layer( hidden_feats * 2 + edge_feats, 32)
         self.U = Linear_layer(hidden_feats * 2 , hidden_feats)
-        self.decoder = Linear_layer(hidden_feats * 2 , in_feats)
-        self.termination = Linear_layer(hidden_feats , 1) # Find a way to have only 2 outputs whatever the graph size is
+        #self.decoder = Linear_layer(hidden_feats * 2 , in_feats) # "first" version, does not account for next node prediction
+        self.decoder_nextnode = Linear_layer(hidden_feats * 2 , 1) # output "energy" will be soft-maxed to predict next node
+        self.decoder_update = Linear_layer(hidden_feats*2+1, in_feats) # takes the same inputs + next_node "energy" and computes updates
+        self.termination = Linear_layer(hidden_feats , 1) # Find a way to have only 1 outputs whatever the graph size is
         self.useCuda = useCuda
 
     def compute_send_messages(self, edges):
@@ -87,11 +89,15 @@ class MPNN(nn.Module):
         loc_out = self.termination(loc_inp)
         m = nn.Sigmoid()
         stop = m(loc_out)
+        stop = torch.max(stop).view((1,1))
 
         # Decoder
-        new_state = self.decoder(torch.cat([new_hidden, z], 1))
+        #new_state = self.decoder(torch.cat([new_hidden, z], 1)) # first version
+        next_node_energy = self.decoder_nextnode(torch.cat([new_hidden, z], 1))
+        # Add a message-passing between the two?
+        new_state = self.decoder_update(torch.cat([new_hidden, z, next_node_energy], 1))
 
-        return new_state, new_hidden, stop
+        return new_state, new_hidden, stop, next_node_energy
         
 
     # Iterate steps until completion
@@ -121,7 +127,7 @@ class MPNN(nn.Module):
 
         # Iterate the algorithm for all steps
         for i in range(states.size(0)-1):
-            new_state, hidden, stop = self.step(graph, pred_all[i], hidden)
+            new_state, hidden, stop, next_node_energy = self.step(graph, pred_all[i], hidden)
 
             pred_all.append(new_state)
             pred_stop.append(stop)

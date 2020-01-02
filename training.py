@@ -41,7 +41,7 @@ max_steps = nb_nodes + 1 # maximum number of steps before stopping
 
 start = time.time()
 data_gen = DatasetGenerator()
-graphs, history_dataset = data_gen.run(graph_type, nb_graphs, nb_nodes,
+graphs, history_dataset, next_nodes = data_gen.run(graph_type, nb_graphs, nb_nodes,
                                 algorithm_type)
 
 print('Dataset created in:', time.time()-start)
