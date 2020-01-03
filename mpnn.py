@@ -140,7 +140,7 @@ class MPNN(nn.Module):
             pred_stop.append(stop)
             pred_nextnode.append(next_node_pred)
         
-        preds = torch.stack(pred_all, dim=1).view(states.size(0)-1,states.size(0))
+        preds = torch.stack(pred_all, dim=1).view(states.size(0),states.size(1))
         preds_stop = torch.stack(pred_stop, dim=1)
         preds_nextnode = torch.stack(pred_nextnode, dim=1)
         

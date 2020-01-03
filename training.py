@@ -117,6 +117,11 @@ def nll_gaussian(preds, target):
 
 verbose = False
 
+teacher_forcing = True
+
+if teacher_forcing:
+    print('Using teacher forcing!')
+
 for epoch in range(nb_epochs):
     print('Epoch:', epoch)
 
@@ -124,49 +129,73 @@ for epoch in range(nb_epochs):
     clock = time.time()
 
     for batch_idx, (graph, edges_mat, states, termination, nextnodes_mat) in enumerate(train_data):
-        if verbose: print('--- Processing new graph! ---')
-
-        # We do optimizer call only after completely processing the graph
-        #graph, states = graphs[i], history_dataset[i]
-        # extract adjacency matrix
-        #edges_mat = nx.to_numpy_matrix(graph)
-        if verbose: print('edges_mat shape:', edges_mat.shape)
-        # Convert graph to DGL
-        #graph = dgl.DGLGraph(graph)
-
-
-        if verbose: print('states shape (after reshape):', states.shape)
-        if verbose: print('termination shape (after reshape):', termination.shape)
 
         states = torch.from_numpy(states)
         edges_mat = torch.from_numpy(edges_mat)
         termination = torch.from_numpy(termination)
         nextnodes_mat = torch.from_numpy(nextnodes_mat)
-
-        if use_cuda:
-            states, edges_mat, termination, nextnodes_mat = states.cuda(), edges_mat.cuda(), termination.cuda(), nextnodes_mat.cuda()
         
-        preds, pred_stops, pred_nextnodes = model(graph, states, edges_mat)
+        if use_cuda:
+                states, edges_mat, termination, nextnodes_mat = states.cuda(), edges_mat.cuda(), termination.cuda(), nextnodes_mat.cuda()
 
-        #print('true', nextnodes_mat.size())
-        pred_nextnodes = pred_nextnodes.view(-1, pred_nextnodes.size()[0])
-        #print('pred', pred_nextnodes.size())
+        if verbose:
+                print('--- Processing new graph! ---')
+                print('edges_mat shape:', edges_mat.shape)
+                print('states shape (after reshape):', states.shape)
+                print('termination shape (after reshape):', termination.shape)
 
-        # Compare the components of the loss for tuning
-        loss = nll_gaussian(preds, torch.t(states))
-        print('prediction loss:', nll_gaussian(preds, torch.t(states)))
-        loss += 100* nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat)
-        print('Next node prediction loss:', nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat))
-        print('pred_nextnodes', pred_nextnodes)
-        print('nextnodes_mat', nextnodes_mat)
-        loss += ((pred_stops-termination)**2).sum()/max_steps # MSE of output and states + termination loss
-        print('termination loss:', ((pred_stops-termination)**2).sum()/max_steps)
+        if teacher_forcing:
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            for step in range(states.size()[1]-1):
+                loc_states = states[step:step+2]
+                loc_nextnode = nextnodes_mat[step]
+                loc_termination = termination[step:step+2]
+                preds, pred_stops, pred_nextnodes = model(graph, loc_states, edges_mat)
+                pred_nextnodes = pred_nextnodes.view(-1, pred_nextnodes.size()[0])
+                #print('size of nextnode pred in train', pred_nextnodes.size())
 
-        losses.append(loss.item())
+                loss = nll_gaussian(preds, (loc_states))
+                loss += 100 * nn.CrossEntropyLoss()(pred_nextnodes, loc_nextnode.unsqueeze(0))
+                loss += ((pred_stops-loc_termination)**2).sum()/max_steps
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                losses.append(loss.item())
+                
+
+        else:
+
+
+            # We do optimizer call only after completely processing the graph
+            #graph, states = graphs[i], history_dataset[i]
+            # extract adjacency matrix
+            #edges_mat = nx.to_numpy_matrix(graph)
+            # Convert graph to DGL
+            #graph = dgl.DGLGraph(graph)
+            
+            preds, pred_stops, pred_nextnodes = model(graph, states, edges_mat)
+
+            #print('true', nextnodes_mat.size())
+            pred_nextnodes = pred_nextnodes.view(-1, pred_nextnodes.size()[0])
+            #print('pred', pred_nextnodes.size())
+
+            # Compare the components of the loss for tuning
+            loss = nll_gaussian(preds, torch.t(states))
+            print('prediction loss:', nll_gaussian(preds, torch.t(states)))
+            loss += 100 * nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat)
+            print('Next node prediction loss:', nn.CrossEntropyLoss()(pred_nextnodes, nextnodes_mat))
+            print('pred_nextnodes', pred_nextnodes)
+            print('nextnodes_mat', nextnodes_mat)
+            loss += ((pred_stops-termination)**2).sum()/max_steps # MSE of output and states + termination loss
+            print('termination loss:', ((pred_stops-termination)**2).sum()/max_steps)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            losses.append(loss.item())
 
     print('Epoch run in:', time.time()-clock)
     clock = time.time()
