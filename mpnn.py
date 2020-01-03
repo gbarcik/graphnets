@@ -13,17 +13,6 @@ random.seed(33)
 
 # Do not use DGL in the end?
 
-# Define the linear projection module
-class Linear_layer(nn.Module):
-    def __init__(self, in_feats, out_feats):
-        super(Linear_layer, self).__init__()
-        self.linear = nn.Linear(in_feats, out_feats)
-
-    def forward(self, inputs):
-        # perform linear transformation
-        return self.linear(inputs)
-
-
 # A first NN for a single algorithm
 # Define the MPNN module
 # (Use of DFS for the first exemple)
@@ -33,13 +22,13 @@ class MPNN(nn.Module):
     def __init__(self, in_feats, hidden_feats, edge_feats, out_feats, useCuda=False):
         super(MPNN, self).__init__()
         self.n_hid = hidden_feats
-        self.encoder = Linear_layer(in_feats + hidden_feats +1, hidden_feats) # +1 is for the weights (needed so far, might be removed later)
-        self.M = Linear_layer( hidden_feats * 2 + edge_feats, 32)
-        self.U = Linear_layer(hidden_feats * 2 , hidden_feats)
+        self.encoder = nn.Linear(in_feats + hidden_feats +1, hidden_feats) # +1 is for the weights (needed so far, might be removed later)
+        self.M = nn.Linear( hidden_feats * 2 + edge_feats, 32)
+        self.U = nn.Linear(hidden_feats * 2 , hidden_feats)
         #self.decoder = Linear_layer(hidden_feats * 2 , in_feats) # "first" version, does not account for next node prediction
-        self.decoder_nextnode = Linear_layer(hidden_feats * 2 , 1) # output "energy" will be soft-maxed to predict next node
-        self.decoder_update = Linear_layer(hidden_feats*2+1, in_feats) # takes the same inputs + next_node "energy" and computes updates
-        self.termination = Linear_layer(hidden_feats , 1) # Find a way to have only 1 outputs whatever the graph size is
+        self.decoder_nextnode = nn.Linear(hidden_feats * 2 , 1) # output "energy" will be soft-maxed to predict next node
+        self.decoder_update = nn.Linear(hidden_feats*2+1, in_feats) # takes the same inputs + next_node "energy" and computes updates
+        self.termination = nn.Linear(hidden_feats , 1) # Find a way to have only 1 outputs whatever the graph size is
         self.useCuda = useCuda
 
     def compute_send_messages(self, edges):
