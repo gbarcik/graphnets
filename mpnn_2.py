@@ -3,7 +3,6 @@
 # Part of the code is based on https://github.com/timlacroix/nri_practical_session
 
 import dgl
-from generate_dataset import DatasetGenerator
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
