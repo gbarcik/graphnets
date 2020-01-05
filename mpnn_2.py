@@ -3,7 +3,6 @@
 # Part of the code is based on https://github.com/timlacroix/nri_practical_session
 
 import dgl
-from generate_dataset import DatasetGenerator
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -103,17 +102,17 @@ class MPNN(nn.Module):
             pred_stop = [torch.tensor([[0]]).float().cuda()]
 
         # Iterate the algorithm for all steps
-        for i in range(states.size(0)-1):
+        for i in range(states.size(0)): # -1
             new_state, hidden, stop = self.step(graph, states[i], hidden)
 
             pred_states.append(new_state)
             pred_stop.append(stop)
                 
-        if len(pred_states) == 0:
+        if len(pred_states) == 1: # 0
             preds = torch.empty(1)
-            preds_stop = pred_stop
+            preds_stop = torch.stack([pred_stop[1]], dim=1)
         else:
-            preds = torch.stack(pred_states, dim=0).view(-1, states.size(1))
-            preds_stop = torch.stack(pred_stop, dim=1)
+            preds = torch.stack(pred_states[:-1], dim=0).view(-1, states.size(1))
+            preds_stop = torch.stack(pred_stop[:-1], dim=1)
         
         return preds, preds_stop

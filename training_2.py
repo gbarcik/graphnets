@@ -16,7 +16,7 @@ import numpy as np
 import random
 random.seed(33)
 
-use_cuda = torch.cuda.is_available()
+use_cuda = False # torch.cuda.is_available()
 
 #####################################################
 # --- Training parameters
@@ -145,14 +145,18 @@ for epoch in range(nb_epochs):
         # Compare the components of the loss for tuning
                 
         # target = [np.where(states[0])[0]]
-        target = []
-        target.extend([np.where(states[i]-states[i-1])[0] for i in range(1, states.shape[0])])
-        target = np.hstack(target)
-        target = torch.LongTensor(target)
+        if states.shape[0] > 1:
+            target = []
+            target.extend([np.where(states[i]-states[i-1])[0] for i in range(1, states.shape[0])])
+            target = np.hstack(target)
+            target = torch.LongTensor(target)
 
-        loss = nn.CrossEntropyLoss()
-        output = loss(preds, target)
-        print(output.item())
+            loss = nn.CrossEntropyLoss()
+            output = loss(preds, target)
+            print(output.item())
+        else:
+            # Sometimes the algorithm is already terminated when starting, in which case there is nothing to compare
+            output = torch.tensor([0]).type(torch.FloatTensor)
         
         loss2 = nn.BCELoss()
         output += loss2(pred_stops.view(-1, 1), termination.float().view(-1, 1))
