@@ -29,7 +29,7 @@ lr = 0.005
 
 # Datasets parameters
 graph_type = 'erdos_renyi'
-nb_graphs = 20 # 5
+nb_graphs = 200 # 5
 nb_nodes = 10 # 5
 algorithm_type = 'DFS'
 
@@ -119,8 +119,11 @@ if teacher_forcing:
 for epoch in range(nb_epochs):
     print('Epoch:', epoch)
 
-    losses = []
+    train_losses = []
+    test_losses = []
     clock = time.time()
+
+    model.train()
 
     for batch_idx, (graph, edges_mat, states, termination) in enumerate(train_data):
 
@@ -168,14 +171,69 @@ for epoch in range(nb_epochs):
         output.backward()
         optimizer.step()
 
-        losses.append(output.item())
+        train_losses.append(output.item())
 
+    # print('states:', states)
+    # print('pred:', preds)
+
+    print('Train epoch run in:', time.time()-clock)
+    clock = time.time()
+    print(' Training Loss:', np.mean(np.asarray(train_losses)))
+
+    model.eval()
+
+    # TODO: add testing
+    for batch_idx, (graph, edges_mat, states, termination) in enumerate(test_data):
+
+        states = torch.from_numpy(np.asarray(states))
+        edges_mat = torch.from_numpy(edges_mat)
+        termination = torch.from_numpy(termination)
+
+        #import pdb; pdb.set_trace()
+
+        if states.shape[0] > 1:
+            # if more than 1 state, prepare the target of the network
+            target = []
+            target.extend([np.where(states[i]-states[i-1])[0] for i in range(1, states.shape[0])])
+            target = np.hstack(target)
+            target = torch.LongTensor(target)
+            if use_cuda: target = target.cuda()
+
+        if use_cuda:
+            states, edges_mat, termination = states.cuda(), edges_mat.cuda(), termination.cuda()
+
+        if verbose:
+                print('--- Processing new graph! ---')
+                print('edges_mat shape:', edges_mat.shape)
+                print('states shape (after reshape):', states.shape)
+                print('termination shape (after reshape):', termination.shape)
+
+        # We do optimizer call only after completely processing the graph
+        preds, pred_stops = model(graph, states, edges_mat)
+
+        # Compare the components of the loss for tuning
+                
+        # target = [np.where(states[0])[0]]
+        if states.shape[0] > 1:
+            loss = nn.CrossEntropyLoss()
+            output = loss(preds, target)
+        else:
+            # Sometimes the algorithm is already terminated when starting, in which case there is nothing to compare
+            output = torch.tensor([0]).type(torch.FloatTensor)
+            if use_cuda: output = output.cuda()
+        
+        loss2 = nn.BCELoss()
+        output += loss2(pred_stops.view(-1, 1), termination.float().view(-1, 1))
+
+        test_losses.append(output.item())
+
+    print('--- Test exemple ---')
     print('states:', states)
     print('pred:', preds)
 
-    print('Epoch run in:', time.time()-clock)
+    print('Test epoch run in:', time.time()-clock)
     clock = time.time()
-    print('Loss:', np.mean(np.asarray(losses)))
+    print(' Test Loss:', np.mean(np.asarray(test_losses)))
 
 #import pdb; pdb.set_trace()
 print('states:', states)
