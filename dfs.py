@@ -87,7 +87,7 @@ class DFS:
 
         neigh = sorted(neigh, key=lambda id: graph.nodes[id]['priority'])
 
-        neigh.reverse()
+        #neigh.reverse()
 
         for ind in neigh:
             # If son was not explored, update it it
