@@ -29,11 +29,19 @@ lr = 0.0005
 
 # Datasets parameters
 graph_type = 'erdos_renyi'
-nb_graphs = 200 # 5
-nb_nodes = 10 # 5
 algorithm_type = 'DFS'
 
-max_steps = nb_nodes + 1 # maximum number of steps before stopping
+nb_graphs = {}
+nb_nodes = {}
+
+# Allows to generate graphs of different sizes in each dataset
+nb_graphs['train'] = [180] # 5
+nb_nodes['train'] = [10] # 5
+
+nb_graphs['test'] = [20]
+nb_nodes['test'] = [10]
+
+max_steps = max(max(nb_nodes['train']), max(nb_nodes['test'])) + 1 # maximum number of steps before stopping
 # I added +1 as experimentally the case happends, to investigate
 
 ####################################################
@@ -42,55 +50,72 @@ max_steps = nb_nodes + 1 # maximum number of steps before stopping
 
 start = time.time()
 data_gen = DatasetGenerator()
-graphs, next_nodes = data_gen.run(graph_type, nb_graphs, nb_nodes,
-                                algorithm_type)
+
+data = {
+    'train': [],
+    'test': []
+}
+
+for phase in ['train', 'test']:
+    # Generate the right number of graphs of each size
+    for idx, nb_g in enumerate(nb_graphs[phase]):
+
+        nb_n = nb_nodes[phase][idx]
+
+        graphs, next_nodes = data_gen.run(graph_type, nb_g, nb_n,
+                                        algorithm_type)
+
+        #import pdb; pdb.set_trace()
+
+        # Prepare the data in an easily exploitable format
+        # It could probably be optimised with DGL
+
+        terminations = []
+        edges_mats = []
+        next_nodes = list(next_nodes)
+        # next_nodes = np.asarray(next_nodes)
+        # Do all the necessary transforms on the data
+        for i in range(nb_g):
+            states = np.asarray(next_nodes[i])
+            # termination = np.zeros(states.shape[0])
+            termination = np.zeros(len(states))
+            termination[-1] = 1
+            
+            # Adding self edge to every node, as in the paper
+            for j in range(nb_n):
+                graphs[i].add_edge(j, j)
+
+            assert max_steps >= len(states)
+
+            # set states to fixed lenght with termination boolean to be able to compute termination error
+            # if states.shape[0] < max_steps:
+            #     pad_idx = [(0,0) for i in range(states.ndim)]
+            #     pad_idx[0] = (0, max_steps-states.shape[0])
+            #     state = np.pad(states, pad_idx, 'edge')
+            #     termination = np.pad(termination, (0, max_steps-termination.size), 'constant', constant_values=(1))
+            
+            # next_nodes[i] = state
+            # For nn.CrossEntroppyLoss, next node is expected to be an index and not 1 hot
+            # nextnode_data = np.argmax(nextnode_data, axis=1)
+            terminations.append(termination)
+            edges_mats.append(nx.to_numpy_matrix(graphs[i]))
+            g = dgl.DGLGraph()
+            g.from_networkx(graphs[i], node_attrs=['priority'])
+            graphs[i] = g
+
+        data[phase] += [(graphs[i], edges_mats[i], next_nodes[i], terminations[i]) for i in range(nb_g)]
+
+train_data = data['train']
+test_data = data['test']
 
 print('Dataset created in:', time.time()-start)
 clock = time.time()
 
-#import pdb; pdb.set_trace()
-
-# Prepare the data in an easily exploitable format
-# It could probably be optimised with DGL
-
-terminations = []
-edges_mats = []
-next_nodes = list(next_nodes)
-# next_nodes = np.asarray(next_nodes)
-# Do all the necessary transforms on the data
-for i in range(nb_graphs):
-    states = np.asarray(next_nodes[i])
-    # termination = np.zeros(states.shape[0])
-    termination = np.zeros(len(states))
-    termination[-1] = 1
-    
-    # Adding self edge to every node, as in the paper
-    for j in range(nb_nodes):
-        graphs[i].add_edge(j, j)
-
-    assert max_steps >= len(states)
-
-    # set states to fixed lenght with termination boolean to be able to compute termination error
-    # if states.shape[0] < max_steps:
-    #     pad_idx = [(0,0) for i in range(states.ndim)]
-    #     pad_idx[0] = (0, max_steps-states.shape[0])
-    #     state = np.pad(states, pad_idx, 'edge')
-    #     termination = np.pad(termination, (0, max_steps-termination.size), 'constant', constant_values=(1))
-    
-    # next_nodes[i] = state
-    # For nn.CrossEntroppyLoss, next node is expected to be an index and not 1 hot
-    # nextnode_data = np.argmax(nextnode_data, axis=1)
-    terminations.append(termination)
-    edges_mats.append(nx.to_numpy_matrix(graphs[i]))
-    g = dgl.DGLGraph()
-    g.from_networkx(graphs[i], node_attrs=['priority'])
-    graphs[i] = g
-
-# Take 10% of the graphs as validation
+'''# Take 10% of the graphs as validation
 nb_val = int(0.1*nb_graphs)
 
 train_data = [(graphs[i], edges_mats[i], next_nodes[i], terminations[i]) for i in range(nb_graphs-nb_val)]
-test_data = [(graphs[i], edges_mats[i], next_nodes[i], terminations[i]) for i in range(nb_graphs-nb_val, nb_graphs)]
+test_data = [(graphs[i], edges_mats[i], next_nodes[i], terminations[i]) for i in range(nb_graphs-nb_val, nb_graphs)]'''
 
 ###################################################
 
