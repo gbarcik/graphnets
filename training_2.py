@@ -28,7 +28,7 @@ nb_features = 32
 lr = 0.0005
 
 # Datasets parameters
-graph_type = 'erdos_renyi'
+#graph_type = 'erdos_renyi'
 algorithm_type = 'DFS'
 
 nb_graphs = {}
@@ -36,13 +36,13 @@ nb_nodes = {}
 graph_types = {}
 
 # Allows to generate graphs of different sizes in each dataset
-nb_graphs['train'] = [80] # 5
+nb_graphs['train'] = [100] # 5
 nb_nodes['train'] = [20] # 5
 graph_types['train'] = ['erdos_renyi']
 
 nb_graphs['test'] = [20]
 nb_nodes['test'] = [20]
-graph_types['test'] = ['barabasi_albert']
+graph_types['test'] = ['erdos_renyi']
 
 max_steps = max(max(nb_nodes['train']), max(nb_nodes['test'])) + 1 # maximum number of steps before stopping
 # I added +1 as experimentally the case happends, to investigate
@@ -215,6 +215,12 @@ for epoch in range(nb_epochs):
         train_losses.append(output.item())
         if states.shape[0] > 1: train_accuracies.append(next_state_accuracy(preds, target))
 
+        '''if (epoch==nb_epochs-1) and (next_state_accuracy(preds, target)<1):
+            print('Train ex:')
+            print('edges:', edges_mat)
+            print('graph:', graph.nodes[:].data['priority'])
+            print('states:', states)
+            print('pred:', preds)'''
     # print('states:', states)
     # print('pred:', preds)
 
@@ -269,11 +275,20 @@ for epoch in range(nb_epochs):
 
         test_losses.append(output.item())
         if states.shape[0] > 1: test_accuracies.append(next_state_accuracy(preds, target))
+
+        '''if epoch==nb_epochs-1:
+            print('Test ex:')
+            print('edges:', edges_mat)
+            print('graph:', graph.nodes[:].data['priority'])
+            print('states:', states)
+            print('pred:', preds)'''
         
 
     #print('--- Test exemple ---')
-    #print('states:', states)
-    #print('pred:', preds)
+    if epoch<nb_epochs-1:
+        print('Test ex')
+        print('states:', states)
+        print('pred:', preds)
 
     print('Test epoch run in:', time.time()-clock)
     clock = time.time()

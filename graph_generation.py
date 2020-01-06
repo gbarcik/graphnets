@@ -20,7 +20,7 @@ class GraphGenerator:
 
         if graph_type == 'erdos_renyi':
             p = min(np.log(nb_nodes)/nb_nodes, 0.5)
-            g = nx.erdos_renyi_graph(n=nb_nodes, p=p, directed=True)
+            g = nx.erdos_renyi_graph(n=nb_nodes, p=p, directed=False)
 
         if graph_type == 'barabasi_albert':
             nb_neighs = 5
