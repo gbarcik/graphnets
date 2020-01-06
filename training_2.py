@@ -252,10 +252,9 @@ for epoch in range(nb_epochs):
                 print('termination shape (after reshape):', termination.shape)
 
         # We do optimizer call only after completely processing the graph
-        preds, pred_stops = model(graph, states, edges_mat)
+        preds, pred_stops = model.predict(graph, states, edges_mat)
 
         # Compare the components of the loss for tuning
-                
         # target = [np.where(states[0])[0]]
         if states.shape[0] > 1:
             loss = nn.CrossEntropyLoss()
