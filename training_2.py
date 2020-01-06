@@ -14,7 +14,7 @@ import numpy as np
 
 # Setting the seed for replicability
 import random
-random.seed(34)
+random.seed(32)
 
 use_cuda = torch.cuda.is_available()
 
@@ -25,7 +25,7 @@ use_cuda = torch.cuda.is_available()
 # For the training hyperparameters, insire from paper
 nb_epochs = 50
 nb_features = 32
-lr = 0.005
+lr = 0.0005
 
 # Datasets parameters
 graph_type = 'erdos_renyi'
@@ -109,6 +109,14 @@ def nll_gaussian(preds, target):
     neg_log_p = ((preds - target) ** 2)
     return neg_log_p.sum() / (target.size(0) * target.size(1))
 
+def next_state_accuracy(preds, targets):
+    '''
+    Evaluates the average accuracy in predicting the next node
+    '''
+    next_node_pred = torch.argmax(preds, axis=-1)
+    nb_false = torch.nonzero(target-next_node_pred).size(0)
+    return (target.shape[0]-nb_false) / target.shape[0]
+
 verbose = False
 
 teacher_forcing = True
@@ -121,6 +129,10 @@ for epoch in range(nb_epochs):
 
     train_losses = []
     test_losses = []
+
+    train_accuracies = []
+    test_accuracies = []
+
     clock = time.time()
 
     model.train()
@@ -172,6 +184,7 @@ for epoch in range(nb_epochs):
         optimizer.step()
 
         train_losses.append(output.item())
+        if states.shape[0] > 1: train_accuracies.append(next_state_accuracy(preds, target))
 
     # print('states:', states)
     # print('pred:', preds)
@@ -179,6 +192,7 @@ for epoch in range(nb_epochs):
     print('Train epoch run in:', time.time()-clock)
     clock = time.time()
     print(' Training Loss:', np.mean(np.asarray(train_losses)))
+    print('Train average accuracy:', np.mean(np.asarray(train_accuracies)))
 
     model.eval()
 
@@ -226,6 +240,8 @@ for epoch in range(nb_epochs):
         output += loss2(pred_stops.view(-1, 1), termination.float().view(-1, 1))
 
         test_losses.append(output.item())
+        if states.shape[0] > 1: test_accuracies.append(next_state_accuracy(preds, target))
+        
 
     print('--- Test exemple ---')
     print('states:', states)
@@ -234,6 +250,7 @@ for epoch in range(nb_epochs):
     print('Test epoch run in:', time.time()-clock)
     clock = time.time()
     print(' Test Loss:', np.mean(np.asarray(test_losses)))
+    print('Test average accuracy:', np.mean(np.asarray(test_accuracies)))
 
 #import pdb; pdb.set_trace()
 print('states:', states)
