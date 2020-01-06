@@ -33,13 +33,16 @@ algorithm_type = 'DFS'
 
 nb_graphs = {}
 nb_nodes = {}
+graph_types = {}
 
 # Allows to generate graphs of different sizes in each dataset
-nb_graphs['train'] = [180] # 5
-nb_nodes['train'] = [10] # 5
+nb_graphs['train'] = [80] # 5
+nb_nodes['train'] = [20] # 5
+graph_types['train'] = ['erdos_renyi']
 
 nb_graphs['test'] = [20]
-nb_nodes['test'] = [10]
+nb_nodes['test'] = [20]
+graph_types['test'] = ['barabasi_albert']
 
 max_steps = max(max(nb_nodes['train']), max(nb_nodes['test'])) + 1 # maximum number of steps before stopping
 # I added +1 as experimentally the case happends, to investigate
@@ -61,6 +64,7 @@ for phase in ['train', 'test']:
     for idx, nb_g in enumerate(nb_graphs[phase]):
 
         nb_n = nb_nodes[phase][idx]
+        graph_type = graph_types[phase][idx]
 
         graphs, next_nodes = data_gen.run(graph_type, nb_g, nb_n,
                                         algorithm_type)
@@ -268,9 +272,9 @@ for epoch in range(nb_epochs):
         if states.shape[0] > 1: test_accuracies.append(next_state_accuracy(preds, target))
         
 
-    print('--- Test exemple ---')
-    print('states:', states)
-    print('pred:', preds)
+    #print('--- Test exemple ---')
+    #print('states:', states)
+    #print('pred:', preds)
 
     print('Test epoch run in:', time.time()-clock)
     clock = time.time()
