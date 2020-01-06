@@ -116,3 +116,50 @@ class MPNN(nn.Module):
             preds_stop = torch.stack(pred_stop[:-1], dim=1)
         
         return preds, preds_stop
+
+
+    # Iterate steps until completion
+    def predict(self, graph, states, edges_mat):
+        # Initialize hidden state at zero
+        hidden = torch.zeros(states.size(1), self.n_hid).float()
+
+        # Store states and termination prediction
+        pred_states = []
+        pred_stop = [torch.tensor([[0]]).float()]
+
+        # set all edges features inside graph (for easier message passing)
+        edges_features = []
+        for i in range(graph.edges()[0].size(0)):
+            # Extract the features of each existing edge
+            edges_features.append(edges_mat[graph.edges()[0][i], graph.edges()[1][i]])
+        
+        graph.edata['features'] = torch.FloatTensor(edges_features)
+
+        if self.useCuda:
+            graph.edata['features'] = graph.edata['features'].cuda()
+            graph.ndata['priority'] = graph.ndata['priority'].cuda()
+            hidden = hidden.cuda()
+            pred_stop = [torch.tensor([[0]]).float().cuda()]
+
+        # Iterate the algorithm until termination flag
+        new_state = states[0]
+        stop = 0
+        for _ in range(graph.number_of_nodes()) :
+            if stop > 0.5:
+                break
+            
+            softmax, hidden, stop = self.step(graph, torch.Tensor(new_state.float()), hidden)
+            idx = torch.argmax(softmax).item()
+            new_state[idx] = 1
+
+            pred_states.append(torch.Tensor(new_state.float()))
+            pred_stop.append(stop)
+        
+        if len(pred_states) == 1: # 0
+            preds = torch.empty(1)
+            preds_stop = torch.stack([pred_stop[1]], dim=1)
+        else:
+            preds = torch.stack(pred_states[:-1], dim=0).view(-1, states.size(1))
+            preds_stop = torch.stack(pred_stop[:-1], dim=1)
+        
+        return preds, preds_stop
