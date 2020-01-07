@@ -143,8 +143,8 @@ def next_state_accuracy(preds, targets):
     Evaluates the average accuracy in predicting the next node
     '''
     next_node_pred = torch.argmax(preds, axis=-1)
-    nb_false = torch.nonzero(target-next_node_pred).size(0)
-    return (target.shape[0]-nb_false) / target.shape[0]
+    nb_false = torch.nonzero(targets-next_node_pred).size(0)
+    return (targets.shape[0]-nb_false) / targets.shape[0]
 
 verbose = False
 
@@ -221,8 +221,6 @@ for epoch in range(nb_epochs):
             print('graph:', graph.nodes[:].data['priority'])
             print('states:', states)
             print('pred:', preds)'''
-    # print('states:', states)
-    # print('pred:', preds)
 
     print('Train epoch run in:', time.time()-clock)
     clock = time.time()
@@ -231,7 +229,6 @@ for epoch in range(nb_epochs):
 
     model.eval()
 
-    # TODO: add testing
     for batch_idx, (graph, edges_mat, states, termination) in enumerate(test_data):
 
         states = torch.from_numpy(np.asarray(states))
@@ -257,31 +254,30 @@ for epoch in range(nb_epochs):
                 print('states shape (after reshape):', states.shape)
                 print('termination shape (after reshape):', termination.shape)
 
+
         # We do optimizer call only after completely processing the graph
         preds, pred_stops = model.predict(graph, states, edges_mat)
 
         # Compare the components of the loss for tuning
-        # target = [np.where(states[0])[0]]
-        if states.shape[0] > 1:
+
+        # In tests, need to compare the right lenghts
+        if preds is not None: comparable_lenght = min(preds.size()[0], target.size()[0])
+        else: comparable_lenght = 1
+
+        if states.shape[0] > 1 and preds is not None: # 
             loss = nn.CrossEntropyLoss()
-            output = loss(preds, target)
+            output = loss(preds[:comparable_lenght], target[:comparable_lenght])
         else:
             # Sometimes the algorithm is already terminated when starting, in which case there is nothing to compare
             output = torch.tensor([0]).type(torch.FloatTensor)
             if use_cuda: output = output.cuda()
         
         loss2 = nn.BCELoss()
-        output += loss2(pred_stops.view(-1, 1), termination.float().view(-1, 1))
+        output += loss2(pred_stops.view(-1, 1)[:comparable_lenght], termination.float().view(-1, 1)[:comparable_lenght])
 
         test_losses.append(output.item())
-        if states.shape[0] > 1: test_accuracies.append(next_state_accuracy(preds, target))
+        if states.shape[0] > 1 and preds is not None: test_accuracies.append(next_state_accuracy(preds[:comparable_lenght], target[:comparable_lenght]))
 
-        '''if epoch==nb_epochs-1:
-            print('Test ex:')
-            print('edges:', edges_mat)
-            print('graph:', graph.nodes[:].data['priority'])
-            print('states:', states)
-            print('pred:', preds)'''
         
 
     #print('--- Test exemple ---')

@@ -142,21 +142,27 @@ class MPNN(nn.Module):
             pred_stop = [torch.tensor([[0]]).float().cuda()]
 
         # Iterate the algorithm until termination flag
-        new_state = states[0]
+        new_state = states[0].clone() # Clone to avoid modifying ground truth data
         stop = 0
         for _ in range(graph.number_of_nodes()) :
             if stop > 0.5:
                 break
-            
-            softmax, hidden, stop = self.step(graph, torch.Tensor(new_state.float()), hidden)
-            idx = torch.argmax(softmax).item()
-            new_state[idx] = 1
 
-            pred_states.append(torch.Tensor(new_state.float()))
+            softmax, hidden, stop = self.step(graph, new_state, hidden) # was torch.Tensor(new_state.float())
+
+            idx = torch.argmax(softmax).item()
+
+            # loc_res is the prediction, new_state the new state
+            loc_res = torch.zeros(states.size(1), 1).float()
+            if self.useCuda: loc_res = loc_res.cuda()
+            new_state[idx] = 1
+            loc_res[idx] =1
+
+            pred_states.append(loc_res)
             pred_stop.append(stop)
-        
+
         if len(pred_states) == 1: # 0
-            preds = torch.empty(1)
+            preds = None
             preds_stop = torch.stack([pred_stop[1]], dim=1)
         else:
             preds = torch.stack(pred_states[:-1], dim=0).view(-1, states.size(1))
