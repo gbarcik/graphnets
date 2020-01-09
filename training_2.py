@@ -236,8 +236,11 @@ for epoch in range(nb_epochs):
         edges_mat = torch.from_numpy(edges_mat)
         termination = torch.from_numpy(termination)
 
+        '''print('states', states)
+        print('termination init', termination)'''
         #import pdb; pdb.set_trace()
 
+        target = None
         if states.shape[0] > 1:
             # if more than 1 state, prepare the target of the network
             target = []
@@ -262,7 +265,7 @@ for epoch in range(nb_epochs):
         # Compare the components of the loss for tuning
 
         # In tests, need to compare the right lenghts
-        if preds is not None:
+        if preds is not None and states.shape[0] > 1:
             comparable_lenght = min(preds.size()[0], target.size()[0])
             test_exact_terminations += (preds.size()[0] == target.size()[0])
         else:
@@ -278,8 +281,12 @@ for epoch in range(nb_epochs):
             if use_cuda: output = output.cuda()
         
         loss2 = nn.BCELoss()
-        #print('Compared preds terminations', pred_stops.view(-1, 1)[:comparable_lenght+1])
-        #print('Compared true terminations', termination.float().view(-1, 1)[:comparable_lenght+1])
+        '''print('Comparale lenght', comparable_lenght)
+        print('target size:', target.size())
+        print('target', target)
+        print('termination', termination)
+        print('Compared preds terminations', pred_stops.view(-1, 1)[:comparable_lenght+1].size())
+        print('Compared true terminations', termination.float().view(-1, 1)[:comparable_lenght+1].size())'''
         output += loss2(pred_stops.view(-1, 1)[:comparable_lenght+1], termination.float().view(-1, 1)[:comparable_lenght+1])
 
         test_losses.append(output.item())
