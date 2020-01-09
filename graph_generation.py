@@ -2,6 +2,7 @@ import networkx as nx
 import numpy as np
 from matplotlib import pyplot as plt
 
+
 class GraphGenerator:
     def __init__(self):
         pass
@@ -55,4 +56,3 @@ if __name__ == '__main__':
     plt.show()
     print(nx.adjacency_matrix(g).todense())
     print(g.nodes(data=True))
-
