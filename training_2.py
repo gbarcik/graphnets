@@ -1,6 +1,4 @@
 # Performs a training of the current MNN model
-# TODO: store the generated graphs and data to make sure the experiments are replicable
-# TODO: store results of experiments in a file
 
 import dgl
 from generate_dataset_2 import DatasetGenerator
@@ -9,7 +7,6 @@ import torch.nn as nn
 from mpnn_2 import MPNN
 import time
 import networkx as nx
-from matplotlib import pyplot as plt
 import numpy as np
 
 # Setting the seed for replicability
@@ -28,7 +25,6 @@ nb_features = 32
 lr = 0.0005
 
 # Datasets parameters
-#graph_type = 'erdos_renyi'
 algorithm_type = 'DFS'
 
 nb_graphs = {}
@@ -36,16 +32,16 @@ nb_nodes = {}
 graph_types = {}
 
 # Allows to generate graphs of different sizes in each dataset
-nb_graphs['train'] = [100] # 5
-nb_nodes['train'] = [20] # 5
+nb_graphs['train'] = [40]
+nb_nodes['train'] = [20]
 graph_types['train'] = ['erdos_renyi']
 
 nb_graphs['test'] = [20]
 nb_nodes['test'] = [20]
 graph_types['test'] = ['erdos_renyi']
 
-max_steps = max(max(nb_nodes['train']), max(nb_nodes['test'])) + 1 # maximum number of steps before stopping
-# I added +1 as experimentally the case happends, to investigate
+# maximum number of steps before stopping
+max_steps = max(max(nb_nodes['train']), max(nb_nodes['test'])) + 1
 
 ####################################################
 # --- Data generation
@@ -59,6 +55,7 @@ data = {
     'test': []
 }
 
+# Prepare the data in an easily exploitable format
 for phase in ['train', 'test']:
     # Generate the right number of graphs of each size
     for idx, nb_g in enumerate(nb_graphs[phase]):
@@ -66,41 +63,24 @@ for phase in ['train', 'test']:
         nb_n = nb_nodes[phase][idx]
         graph_type = graph_types[phase][idx]
 
-        graphs, next_nodes = data_gen.run(graph_type, nb_g, nb_n,
-                                        algorithm_type)
-
-        #import pdb; pdb.set_trace()
-
-        # Prepare the data in an easily exploitable format
-        # It could probably be optimised with DGL
+        graphs, next_nodes = data_gen.run(graph_type, nb_g, nb_n, algorithm_type)
 
         terminations = []
         edges_mats = []
         next_nodes = list(next_nodes)
-        # next_nodes = np.asarray(next_nodes)
+
         # Do all the necessary transforms on the data
         for i in range(nb_g):
             states = np.asarray(next_nodes[i])
-            # termination = np.zeros(states.shape[0])
             termination = np.zeros(len(states))
             termination[-1] = 1
-            
+
             # Adding self edge to every node, as in the paper
             for j in range(nb_n):
                 graphs[i].add_edge(j, j)
 
             assert max_steps >= len(states)
 
-            # set states to fixed lenght with termination boolean to be able to compute termination error
-            # if states.shape[0] < max_steps:
-            #     pad_idx = [(0,0) for i in range(states.ndim)]
-            #     pad_idx[0] = (0, max_steps-states.shape[0])
-            #     state = np.pad(states, pad_idx, 'edge')
-            #     termination = np.pad(termination, (0, max_steps-termination.size), 'constant', constant_values=(1))
-            
-            # next_nodes[i] = state
-            # For nn.CrossEntroppyLoss, next node is expected to be an index and not 1 hot
-            # nextnode_data = np.argmax(nextnode_data, axis=1)
             terminations.append(termination)
             edges_mats.append(nx.to_numpy_matrix(graphs[i]))
             g = dgl.DGLGraph()
@@ -114,12 +94,6 @@ test_data = data['test']
 
 print('Dataset created in:', time.time()-start)
 clock = time.time()
-
-'''# Take 10% of the graphs as validation
-nb_val = int(0.1*nb_graphs)
-
-train_data = [(graphs[i], edges_mats[i], next_nodes[i], terminations[i]) for i in range(nb_graphs-nb_val)]
-test_data = [(graphs[i], edges_mats[i], next_nodes[i], terminations[i]) for i in range(nb_graphs-nb_val, nb_graphs)]'''
 
 ###################################################
 
@@ -138,10 +112,9 @@ def nll_gaussian(preds, target):
     neg_log_p = ((preds - target) ** 2)
     return neg_log_p.sum() / (target.size(0) * target.size(1))
 
+
 def next_state_accuracy(preds, targets):
-    '''
-    Evaluates the average accuracy in predicting the next node
-    '''
+    # Evaluates the average accuracy in predicting the next node
     next_node_pred = torch.argmax(preds, axis=-1)
     nb_false = torch.nonzero(targets-next_node_pred).size(0)
     return (targets.shape[0]-nb_false) / targets.shape[0]
@@ -172,8 +145,6 @@ for epoch in range(nb_epochs):
         states = torch.from_numpy(np.asarray(states))
         edges_mat = torch.from_numpy(edges_mat)
         termination = torch.from_numpy(termination)
-        
-        #import pdb; pdb.set_trace()
 
         if states.shape[0] > 1:
             # if more than 1 state, prepare the target of the network
@@ -196,8 +167,6 @@ for epoch in range(nb_epochs):
         preds, pred_stops = model(graph, states, edges_mat)
 
         # Compare the components of the loss for tuning
-                
-        # target = [np.where(states[0])[0]]
         if states.shape[0] > 1:
             loss = nn.CrossEntropyLoss()
             output = loss(preds, target)
@@ -205,7 +174,7 @@ for epoch in range(nb_epochs):
             # Sometimes the algorithm is already terminated when starting, in which case there is nothing to compare
             output = torch.tensor([0]).type(torch.FloatTensor)
             if use_cuda: output = output.cuda()
-        
+
         loss2 = nn.BCELoss()
         output += loss2(pred_stops.view(-1, 1), termination.float().view(-1, 1))
 
@@ -215,13 +184,6 @@ for epoch in range(nb_epochs):
 
         train_losses.append(output.item())
         if states.shape[0] > 1: train_accuracies.append(next_state_accuracy(preds, target))
-
-        '''if (epoch==nb_epochs-1) and (next_state_accuracy(preds, target)<1):
-            print('Train ex:')
-            print('edges:', edges_mat)
-            print('graph:', graph.nodes[:].data['priority'])
-            print('states:', states)
-            print('pred:', preds)'''
 
     print('Train epoch run in:', time.time()-clock)
     clock = time.time()
@@ -235,10 +197,6 @@ for epoch in range(nb_epochs):
         states = torch.from_numpy(np.asarray(states))
         edges_mat = torch.from_numpy(edges_mat)
         termination = torch.from_numpy(termination)
-
-        '''print('states', states)
-        print('termination init', termination)'''
-        #import pdb; pdb.set_trace()
 
         target = None
         if states.shape[0] > 1:
@@ -279,22 +237,14 @@ for epoch in range(nb_epochs):
             # Sometimes the algorithm is already terminated when starting, in which case there is nothing to compare
             output = torch.tensor([0]).type(torch.FloatTensor)
             if use_cuda: output = output.cuda()
-        
+
         loss2 = nn.BCELoss()
-        '''print('Comparale lenght', comparable_lenght)
-        print('target size:', target.size())
-        print('target', target)
-        print('termination', termination)
-        print('Compared preds terminations', pred_stops.view(-1, 1)[:comparable_lenght+1].size())
-        print('Compared true terminations', termination.float().view(-1, 1)[:comparable_lenght+1].size())'''
         output += loss2(pred_stops.view(-1, 1)[:comparable_lenght+1], termination.float().view(-1, 1)[:comparable_lenght+1])
 
         test_losses.append(output.item())
         if states.shape[0] > 1 and preds is not None: test_accuracies.append(next_state_accuracy(preds[:comparable_lenght], target[:comparable_lenght]))
 
-        
 
-    #print('--- Test exemple ---')
     if epoch<nb_epochs-1:
         print('Test ex')
         print('states:', states)
@@ -306,7 +256,7 @@ for epoch in range(nb_epochs):
     print('Test average accuracy:', np.mean(np.asarray(test_accuracies)))
     print('Test exact termination accuracy:', test_exact_terminations/len(test_data))
 
-#import pdb; pdb.set_trace()
+
 print('states:', states)
 print('pred:', preds)
 print('termination:', termination)
