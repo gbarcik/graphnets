@@ -14,7 +14,7 @@ class DatasetGenerator:
         graphs = []
         dataset = []
         next_nodes = []
-        
+
 
         for _ in range(nb_graphs):
 
@@ -24,6 +24,7 @@ class DatasetGenerator:
                 graphs.append(graph)
                 history, _ = dfs.run(graph)
                 dataset.append(history)
+
                 # Generate the "next node" data
                 states = []
                 states.append(history[0])
@@ -31,7 +32,7 @@ class DatasetGenerator:
                     idx = np.where(history[i] - history[i+1] > 0)[0][0]
                     s = states[i-1].copy()
                     s[idx] = 1
-                    states.append(s)    
+                    states.append(s)
 
                 next_nodes.append(states)
 
@@ -45,8 +46,6 @@ if __name__ == '__main__':
     algorithm_type = 'DFS'
 
     data_gen = DatasetGenerator()
-    graphs, dataset, next_nodes = data_gen.run(graph_type, nb_graphs, nb_nodes,
-                                  algorithm_type)
+    graphs, dataset, next_nodes = data_gen.run(graph_type, nb_graphs, nb_nodes, algorithm_type)
 
     print(dataset, [np.argmax(next_node, axis=1) for next_node in next_nodes])
-
