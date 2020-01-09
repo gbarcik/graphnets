@@ -125,7 +125,7 @@ class MPNN(nn.Module):
 
         # Store states and termination prediction
         pred_states = []
-        pred_stop = [torch.tensor([[0]]).float()]
+        pred_stop = [] #torch.tensor([[0]]).float()
 
         # set all edges features inside graph (for easier message passing)
         edges_features = []
@@ -165,7 +165,7 @@ class MPNN(nn.Module):
             preds = None
             preds_stop = torch.stack([pred_stop[1]], dim=1)
         else:
-            preds = torch.stack(pred_states[:-1], dim=0).view(-1, states.size(1))
-            preds_stop = torch.stack(pred_stop[:-1], dim=1)
+            preds = torch.stack(pred_states[:], dim=0).view(-1, states.size(1))
+            preds_stop = torch.stack(pred_stop[:], dim=1)
         
         return preds, preds_stop

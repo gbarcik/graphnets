@@ -161,6 +161,7 @@ for epoch in range(nb_epochs):
 
     train_accuracies = []
     test_accuracies = []
+    test_exact_terminations = 0
 
     clock = time.time()
 
@@ -261,8 +262,12 @@ for epoch in range(nb_epochs):
         # Compare the components of the loss for tuning
 
         # In tests, need to compare the right lenghts
-        if preds is not None: comparable_lenght = min(preds.size()[0], target.size()[0])
-        else: comparable_lenght = 1
+        if preds is not None:
+            comparable_lenght = min(preds.size()[0], target.size()[0])
+            test_exact_terminations += (preds.size()[0] == target.size()[0])
+        else:
+            comparable_lenght = 0
+            test_exact_terminations += (states.shape[0] == 1)
 
         if states.shape[0] > 1 and preds is not None: # 
             loss = nn.CrossEntropyLoss()
@@ -273,7 +278,9 @@ for epoch in range(nb_epochs):
             if use_cuda: output = output.cuda()
         
         loss2 = nn.BCELoss()
-        output += loss2(pred_stops.view(-1, 1)[:comparable_lenght], termination.float().view(-1, 1)[:comparable_lenght])
+        #print('Compared preds terminations', pred_stops.view(-1, 1)[:comparable_lenght+1])
+        #print('Compared true terminations', termination.float().view(-1, 1)[:comparable_lenght+1])
+        output += loss2(pred_stops.view(-1, 1)[:comparable_lenght+1], termination.float().view(-1, 1)[:comparable_lenght+1])
 
         test_losses.append(output.item())
         if states.shape[0] > 1 and preds is not None: test_accuracies.append(next_state_accuracy(preds[:comparable_lenght], target[:comparable_lenght]))
@@ -290,6 +297,7 @@ for epoch in range(nb_epochs):
     clock = time.time()
     print(' Test Loss:', np.mean(np.asarray(test_losses)))
     print('Test average accuracy:', np.mean(np.asarray(test_accuracies)))
+    print('Test exact termination accuracy:', test_exact_terminations/len(test_data))
 
 #import pdb; pdb.set_trace()
 print('states:', states)
